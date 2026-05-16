@@ -3,6 +3,31 @@ import Photos
 import PhotosUI
 import SwiftUI
 
+private enum ScreenStep {
+    case selection
+    case options
+    case progress
+    case completed
+}
+
+private enum OptionsTab: Int, CaseIterable, Identifiable {
+    case resolution
+    case bitrate
+    case frameRate
+    case codec
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .resolution: "解像度"
+        case .bitrate: "ビット\nレート"
+        case .frameRate: "フレーム\nレート"
+        case .codec: "コーデック"
+        }
+    }
+}
+
 struct PickedVideo: Transferable {
     let url: URL
 
@@ -35,6 +60,10 @@ struct ContentView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     @State private var saveMessage = ""
+
+    @State private var currentStep: ScreenStep = .selection
+    @State private var selectedTab: OptionsTab = .resolution
+    @State private var compressionFailureMessage: String?
 
     @State private var compressionMode: CompressionMode = .simple
     @State private var targetSizeMB: Double = 100
@@ -117,97 +146,47 @@ struct ContentView: View {
         return String(format: "%.1f%%", ratio)
     }
 
+    private var isAdvancedInputValid: Bool {
+        if compressionMode == .simple { return true }
+        if bitrateMode == .direct && bitrateDirectKbps <= 0 { return false }
+        if !removeAudio && audioBitrateMode == .direct && audioBitrateDirectKbps <= 0 { return false }
+        if frameRateMode == .direct && frameRateDirectFps <= 0 { return false }
+        if resolutionMode == .direct && (resolutionDirectWidth <= 0 || resolutionDirectHeight <= 0) { return false }
+        return true
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section("1. 動画を選択") {
-                    PhotosPicker(selection: $selectedItem, matching: .videos) {
-                        Label("動画を選択", systemImage: "video.badge.plus")
-                    }
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("VideoCompressor")
+                            .font(.title)
+                            .bold()
 
-                    LabeledContent("元サイズ") {
-                        Text(sourceFileSizeText)
-                    }
-
-                    if let sourceInfo {
-                        LabeledContent("長さ") {
-                            Text(formatDuration(milliseconds: sourceInfo.durationMs))
-                        }
-                        LabeledContent("解像度") {
-                            Text("\(sourceInfo.width)×\(sourceInfo.height)")
-                        }
-                        LabeledContent("動画ビットレート") {
-                            Text(formatBitrate(bps: sourceInfo.bitrateBps))
-                        }
-                        LabeledContent("音声ビットレート") {
-                            Text(formatBitrate(bps: sourceInfo.audioBitrateBps))
+                        switch currentStep {
+                        case .selection:
+                            selectionStepContent
+                        case .options:
+                            optionsStepContent
+                        case .progress:
+                            progressStepContent
+                        case .completed:
+                            completedStepContent
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
                 }
 
-                if sourceURL != nil {
-                    Section("2. 圧縮モード") {
-                        Picker("モード", selection: $compressionMode) {
-                            ForEach(CompressionMode.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
+                Divider()
 
-                    if compressionMode == .simple {
-                        simpleModeSection
-                    } else {
-                        advancedModeSection
-                    }
-
-                    Section("3. 圧縮") {
-                        Button {
-                            Task {
-                                await compressVideo()
-                            }
-                        } label: {
-                            if isCompressing {
-                                Label("圧縮中...", systemImage: "hourglass")
-                            } else {
-                                Label("圧縮を開始", systemImage: "arrow.down.circle")
-                            }
-                        }
-                        .disabled(sourceURL == nil || isCompressing)
-
-                        if isCompressing {
-                            ProgressView(value: Double(progress), total: 1.0)
-                        }
-
-                        LabeledContent("圧縮後サイズ") {
-                            Text(compressedFileSizeText)
-                        }
-                    }
-                }
-
-                if let compressedURL {
-                    Section("4. 保存 / 共有") {
-                        ShareLink(item: compressedURL) {
-                            Label("共有する", systemImage: "square.and.arrow.up")
-                        }
-
-                        Button {
-                            Task {
-                                await saveToPhotoLibrary(videoURL: compressedURL)
-                            }
-                        } label: {
-                            Label("写真ライブラリに保存", systemImage: "square.and.arrow.down")
-                        }
-
-                        if !saveMessage.isEmpty {
-                            Text(saveMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                bottomButtons
+                    .padding(16)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle("動画圧縮くん")
+            .navigationBarTitleDisplayMode(.inline)
             .alert("エラー", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -234,7 +213,9 @@ struct ContentView: View {
                     removeAudio = false
                     compressedURL = nil
                     compressedFileSizeText = "-"
+                    compressionFailureMessage = nil
                     saveMessage = ""
+                    currentStep = .selection
                 }
             } catch {
                 presentError(error)
@@ -242,48 +223,139 @@ struct ContentView: View {
         }
     }
 
-    private var simpleModeSection: some View {
-        Section("簡単モード") {
-            LabeledContent("目標ファイルサイズ") {
-                Text("\(Int(targetSizeMB)) MB")
-            }
+    private var selectionStepContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card {
+                PhotosPicker(selection: $selectedItem, matching: .videos) {
+                    Label("動画を選択", systemImage: "video.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
 
-            Slider(value: $targetSizeMB, in: minTargetSizeMB...maxTargetSizeMB, step: 1)
-
-            let computed = currentOptions
-            LabeledContent("推定コーデック") {
-                Text(computed.videoCodec.rawValue)
-            }
-            LabeledContent("推定解像度") {
-                let target = computed.computeTargetResolution(sourceWidth: sourceInfo?.width ?? 1280, sourceHeight: sourceInfo?.height ?? 720)
-                Text("\(Int(target.width))×\(Int(target.height))")
-            }
-            LabeledContent("推定動画ビットレート") {
-                Text(formatBitrate(bps: computed.computeTargetVideoBitrateBps(sourceBitrateBps: sourceInfo?.bitrateBps ?? 0)))
-            }
-            LabeledContent("推定音声ビットレート") {
-                Text(formatBitrate(bps: computed.computeTargetAudioBitrateBps(sourceAudioBitrateBps: sourceInfo?.audioBitrateBps ?? 0)))
-            }
-            LabeledContent("推定圧縮後サイズ") {
-                Text(estimatedSizeText)
-            }
-            LabeledContent("推定圧縮率") {
-                Text(estimatedRatioText)
+                if let sourceInfo {
+                    Divider()
+                    infoRow("サイズ", sourceFileSizeText)
+                    infoRow("長さ", formatDuration(milliseconds: sourceInfo.durationMs))
+                    infoRow("解像度", "\(sourceInfo.width)×\(sourceInfo.height)")
+                    infoRow("ビットレート", formatBitrate(bps: sourceInfo.bitrateBps))
+                    infoRow("音声ビットレート", formatBitrate(bps: sourceInfo.audioBitrateBps))
+                } else {
+                    Divider()
+                    Text("動画が選択されていません")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
-    private var advancedModeSection: some View {
-        Section("詳細モード") {
-            Picker("コーデック", selection: $videoCodec) {
-                ForEach(supportedCodecs) { codec in
-                    Text(codec.rawValue).tag(codec)
+    private var optionsStepContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card {
+                Text("圧縮オプション")
+                    .font(.headline)
+
+                Picker("モード", selection: $compressionMode) {
+                    ForEach(CompressionMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            if compressionMode == .simple {
+                simpleModeOptions
+            } else {
+                advancedModeOptions
+            }
+        }
+    }
+
+    private var simpleModeOptions: some View {
+        card {
+            Text("目標ファイルサイズ: \(Int(targetSizeMB)) MB")
+            Slider(value: $targetSizeMB, in: minTargetSizeMB...maxTargetSizeMB, step: 1)
+
+            Divider()
+
+            let computed = currentOptions
+            infoRow("推定コーデック", computed.videoCodec.rawValue)
+
+            let target = computed.computeTargetResolution(sourceWidth: sourceInfo?.width ?? 1280, sourceHeight: sourceInfo?.height ?? 720)
+            infoRow("推定解像度", "\(Int(target.width))×\(Int(target.height))")
+
+            infoRow("推定動画ビットレート", formatBitrate(bps: computed.computeTargetVideoBitrateBps(sourceBitrateBps: sourceInfo?.bitrateBps ?? 0)))
+            infoRow("推定音声ビットレート", formatBitrate(bps: computed.computeTargetAudioBitrateBps(sourceAudioBitrateBps: sourceInfo?.audioBitrateBps ?? 0)))
+            infoRow("推定サイズ", estimatedSizeText)
+            infoRow("推定圧縮率", estimatedRatioText)
+        }
+    }
+
+    private var advancedModeOptions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card {
+                Picker("タブ", selection: $selectedTab) {
+                    ForEach(OptionsTab.allCases) { tab in
+                        Text(tab.title).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Divider()
+
+                switch selectedTab {
+                case .resolution:
+                    resolutionTab
+                case .bitrate:
+                    bitrateTab
+                case .frameRate:
+                    frameRateTab
+                case .codec:
+                    codecTab
                 }
             }
 
-            Toggle("音声なし", isOn: $removeAudio)
+            card {
+                infoRow("推定圧縮後サイズ", estimatedSizeText)
+                infoRow("推定圧縮率", estimatedRatioText)
+            }
+        }
+    }
 
-            Picker("動画ビットレート", selection: $bitrateMode) {
+    private var resolutionTab: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("解像度モード", selection: $resolutionMode) {
+                ForEach(ResolutionMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+
+            switch resolutionMode {
+            case .percentage:
+                Text("\(Int(resolutionPercentage))%")
+                Slider(value: $resolutionPercentage, in: 10...100, step: 1)
+            case .direct:
+                Text("幅: \(Int(resolutionDirectWidth))")
+                Slider(value: $resolutionDirectWidth, in: 320...3840, step: 2)
+                Text("高さ: \(Int(resolutionDirectHeight))")
+                Slider(value: $resolutionDirectHeight, in: 240...2160, step: 2)
+            case .preset:
+                Picker("プリセット", selection: $resolutionPreset) {
+                    ForEach(ResolutionPreset.allCases) { preset in
+                        let size = preset.size
+                        Text("\(preset.rawValue) (\(Int(size.width))×\(Int(size.height)))").tag(preset)
+                    }
+                }
+            }
+        }
+    }
+
+    private var bitrateTab: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("動画ビットレート")
+                .font(.subheadline)
+                .bold()
+
+            Picker("動画ビットレートモード", selection: $bitrateMode) {
                 ForEach(BitrateMode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)
                 }
@@ -291,41 +363,40 @@ struct ContentView: View {
 
             switch bitrateMode {
             case .percentage:
-                LabeledContent("動画ビットレート") {
-                    Text("\(Int(bitratePercentage))%")
-                }
+                Text("\(Int(bitratePercentage))%")
                 Slider(value: $bitratePercentage, in: 10...100, step: 1)
             case .direct:
-                LabeledContent("動画ビットレート") {
-                    Text("\(Int(bitrateDirectKbps)) kbps")
-                }
+                Text("\(Int(bitrateDirectKbps)) kbps")
                 Slider(value: $bitrateDirectKbps, in: 200...12000, step: 50)
             case .preset:
-                Picker("プリセット", selection: $bitratePreset) {
+                Picker("動画プリセット", selection: $bitratePreset) {
                     ForEach(BitratePreset.allCases) { preset in
                         Text("\(preset.rawValue) (\(preset.kbps) kbps)").tag(preset)
                     }
                 }
             }
 
-            Picker("音声ビットレート", selection: $audioBitrateMode) {
-                ForEach(BitrateMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .disabled(removeAudio)
+            Divider()
+
+            Text("音声ビットレート")
+                .font(.subheadline)
+                .bold()
+
+            Toggle("音声なし", isOn: $removeAudio)
 
             if !removeAudio {
+                Picker("音声ビットレートモード", selection: $audioBitrateMode) {
+                    ForEach(BitrateMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+
                 switch audioBitrateMode {
                 case .percentage:
-                    LabeledContent("音声ビットレート") {
-                        Text("\(Int(audioBitratePercentage))%")
-                    }
+                    Text("\(Int(audioBitratePercentage))%")
                     Slider(value: $audioBitratePercentage, in: 10...100, step: 1)
                 case .direct:
-                    LabeledContent("音声ビットレート") {
-                        Text("\(Int(audioBitrateDirectKbps)) kbps")
-                    }
+                    Text("\(Int(audioBitrateDirectKbps)) kbps")
                     Slider(value: $audioBitrateDirectKbps, in: 32...320, step: 8)
                 case .preset:
                     Picker("音声プリセット", selection: $audioBitratePreset) {
@@ -335,38 +406,12 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+    }
 
-            Picker("解像度", selection: $resolutionMode) {
-                ForEach(ResolutionMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-
-            switch resolutionMode {
-            case .percentage:
-                LabeledContent("解像度") {
-                    Text("\(Int(resolutionPercentage))%")
-                }
-                Slider(value: $resolutionPercentage, in: 10...100, step: 1)
-            case .direct:
-                LabeledContent("幅") {
-                    Text("\(Int(resolutionDirectWidth))")
-                }
-                Slider(value: $resolutionDirectWidth, in: 320...3840, step: 2)
-                LabeledContent("高さ") {
-                    Text("\(Int(resolutionDirectHeight))")
-                }
-                Slider(value: $resolutionDirectHeight, in: 240...2160, step: 2)
-            case .preset:
-                Picker("解像度プリセット", selection: $resolutionPreset) {
-                    ForEach(ResolutionPreset.allCases) { preset in
-                        let size = preset.size
-                        Text("\(preset.rawValue) (\(Int(size.width))×\(Int(size.height)))").tag(preset)
-                    }
-                }
-            }
-
-            Picker("フレームレート", selection: $frameRateMode) {
+    private var frameRateTab: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("フレームレートモード", selection: $frameRateMode) {
                 ForEach(FrameRateMode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)
                 }
@@ -374,14 +419,10 @@ struct ContentView: View {
 
             switch frameRateMode {
             case .percentage:
-                LabeledContent("フレームレート") {
-                    Text("\(Int(frameRatePercentage))%")
-                }
+                Text("\(Int(frameRatePercentage))%")
                 Slider(value: $frameRatePercentage, in: 10...100, step: 1)
             case .direct:
-                LabeledContent("フレームレート") {
-                    Text("\(Int(frameRateDirectFps)) fps")
-                }
+                Text("\(Int(frameRateDirectFps)) fps")
                 Slider(value: $frameRateDirectFps, in: 12...120, step: 1)
             case .preset:
                 Picker("FPSプリセット", selection: $frameRatePreset) {
@@ -391,13 +432,189 @@ struct ContentView: View {
                 }
             }
 
-            LabeledContent("推定圧縮後サイズ") {
-                Text(estimatedSizeText)
-            }
-            LabeledContent("推定圧縮率") {
-                Text(estimatedRatioText)
+            if let sourceInfo, sourceInfo.frameRate > 0 {
+                let target = currentOptions.computeTargetFrameRate(sourceFrameRate: sourceInfo.frameRate)
+                Text("出力フレームレート: \(target) fps")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var codecTab: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("コーデック", selection: $videoCodec) {
+                ForEach(supportedCodecs) { codec in
+                    Text(codec.rawValue).tag(codec)
+                }
+            }
+        }
+    }
+
+    private var progressStepContent: some View {
+        card {
+            VStack(spacing: 16) {
+                if isCompressing {
+                    ZStack {
+                        CircularProgressView(progress: progress)
+                            .frame(width: 160, height: 160)
+                        Text("圧縮処理中")
+                            .font(.subheadline)
+                    }
+
+                    Text("\(Int(progress * 100))%")
+                        .font(.title3)
+                } else if let compressionFailureMessage {
+                    Text("✕")
+                        .font(.system(size: 88, weight: .bold))
+                        .foregroundStyle(.red)
+                    Text("圧縮失敗")
+                        .font(.headline)
+                    Text(compressionFailureMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("圧縮待機中")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        }
+    }
+
+    private var completedStepContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card {
+                VStack(spacing: 12) {
+                    Text("✓")
+                        .font(.system(size: 88, weight: .bold))
+                        .foregroundStyle(.green)
+                    Text("圧縮完了")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+
+                Divider()
+
+                infoRow("元サイズ", sourceFileSizeText)
+                infoRow("圧縮後", compressedFileSizeText)
+                infoRow("圧縮率", compressedRatioText())
+            }
+
+            if let compressedURL {
+                card {
+                    ShareLink(item: compressedURL) {
+                        Label("共有する", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        Task {
+                            await saveToPhotoLibrary(videoURL: compressedURL)
+                        }
+                    } label: {
+                        Label("写真ライブラリに保存", systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if !saveMessage.isEmpty {
+                        Text(saveMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var bottomButtons: some View {
+        Group {
+            switch currentStep {
+            case .selection:
+                Button("次へ") {
+                    currentStep = .options
+                }
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .disabled(sourceURL == nil || isCompressing)
+
+            case .options:
+                HStack(spacing: 8) {
+                    Button("戻る") {
+                        if compressionMode == .simple || selectedTab == .resolution {
+                            currentStep = .selection
+                        } else {
+                            selectedTab = OptionsTab(rawValue: selectedTab.rawValue - 1) ?? .resolution
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.bordered)
+
+                    if compressionMode == .advanced && selectedTab != .codec {
+                        Button("次へ") {
+                            selectedTab = OptionsTab(rawValue: selectedTab.rawValue + 1) ?? .codec
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!isAdvancedInputValid)
+                    } else {
+                        Button("圧縮開始") {
+                            Task {
+                                await compressVideo()
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(sourceURL == nil || isCompressing || !isAdvancedInputValid)
+                    }
+                }
+
+            case .progress:
+                if isCompressing {
+                    ProgressView(value: Double(progress), total: 1.0)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Button("オプションへ戻る") {
+                        compressionFailureMessage = nil
+                        currentStep = .options
+                    }
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.bordered)
+                }
+
+            case .completed:
+                Button("閉じる") {
+                    currentStep = .selection
+                    compressedURL = nil
+                }
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8, content: content)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemBackground))
+            )
+    }
+
+    private func infoRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
     }
 
     @MainActor
@@ -405,6 +622,8 @@ struct ContentView: View {
         guard let sourceURL else { return }
 
         isCompressing = true
+        compressionFailureMessage = nil
+        currentStep = .progress
         progress = 0
         saveMessage = ""
 
@@ -416,7 +635,10 @@ struct ContentView: View {
             }
             compressedURL = resultURL
             compressedFileSizeText = readableFileSize(at: resultURL)
+            currentStep = .completed
         } catch {
+            compressionFailureMessage = error.localizedDescription
+            currentStep = .progress
             presentError(error)
         }
 
@@ -474,6 +696,21 @@ struct ContentView: View {
         )
     }
 
+    private func compressedRatioText() -> String {
+        guard
+            let sourceInfo,
+            sourceInfo.fileSizeBytes > 0,
+            let compressedURL,
+            let compressedSize = try? compressedURL.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+            compressedSize > 0
+        else {
+            return "-"
+        }
+
+        let ratio = (Double(compressedSize) / Double(sourceInfo.fileSizeBytes)) * 100
+        return String(format: "%.1f%%", ratio)
+    }
+
     private func formatDuration(milliseconds: Int) -> String {
         let totalSeconds = max(milliseconds / 1000, 0)
         let hours = totalSeconds / 3600
@@ -516,6 +753,22 @@ struct ContentView: View {
     private func presentError(_ error: Error) {
         errorMessage = error.localizedDescription
         showErrorAlert = true
+    }
+}
+
+private struct CircularProgressView: View {
+    let progress: Float
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
+
+            Circle()
+                .trim(from: 0, to: min(max(progress, 0), 1))
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
     }
 }
 
