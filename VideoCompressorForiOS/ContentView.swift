@@ -161,10 +161,6 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("VideoCompressor")
-                                .font(.title)
-                                .bold()
-
                             switch currentStep {
                             case .selection:
                                 selectionStepContent
