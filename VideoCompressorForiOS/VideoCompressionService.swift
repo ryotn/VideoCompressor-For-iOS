@@ -1,4 +1,5 @@
-import AVFoundation
+@preconcurrency import AVFoundation
+import VideoToolbox
 
 enum CompressionMode: String, CaseIterable, Identifiable {
     case simple = "簡単"
@@ -301,16 +302,22 @@ struct CompressionOptions {
 
 enum VideoCompressionError: LocalizedError {
     case noVideoTrack
-    case exportSessionCreationFailed
-    case exportFailed(underlying: Error?)
+    case readerCreationFailed
+    case writerCreationFailed
+    case invalidAudioTrack
+    case compressionFailed(underlying: Error?)
 
     var errorDescription: String? {
         switch self {
         case .noVideoTrack:
             "動画トラックを読み込めませんでした。"
-        case .exportSessionCreationFailed:
-            "圧縮セッションの作成に失敗しました。"
-        case .exportFailed(let underlying):
+        case .readerCreationFailed:
+            "動画の読み込みセッションの作成に失敗しました。"
+        case .writerCreationFailed:
+            "動画の書き込みセッションの作成に失敗しました。"
+        case .invalidAudioTrack:
+            "音声トラックの設定を読み込めませんでした。"
+        case .compressionFailed(let underlying):
             underlying?.localizedDescription ?? "圧縮処理に失敗しました。"
         }
     }
@@ -319,112 +326,363 @@ enum VideoCompressionError: LocalizedError {
 final class VideoCompressionService {
     func compress(inputURL: URL, options: CompressionOptions, progressHandler: @escaping (Float) -> Void) async throws -> URL {
         let sourceAsset = AVURLAsset(url: inputURL)
-        _ = try await sourceAsset.load(.duration)
-        let sourceTrack = try await sourceAsset.loadTracks(withMediaType: .video).first
+        let duration = try await sourceAsset.load(.duration)
+        let sourceVideoTrack = try await sourceAsset.loadTracks(withMediaType: .video).first
+        let sourceAudioTrack = try await sourceAsset.loadTracks(withMediaType: .audio).first
 
-        let assetForExport: AVAsset
+        guard let sourceVideoTrack else {
+            throw VideoCompressionError.noVideoTrack
+        }
+
+        let sourceSize = try await loadDisplaySize(for: sourceVideoTrack)
+        let renderSize = options.computeRenderSize(sourceSize: sourceSize)
+        let sourceVideoBitrate = Int64(try await sourceVideoTrack.load(.estimatedDataRate))
+        let sourceFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+        let targetVideoBitrate = max(options.computeTargetVideoBitrateBps(sourceBitrateBps: sourceVideoBitrate), 250_000)
+        let targetFrameRate = options.computeTargetFrameRate(sourceFrameRate: sourceFrameRate)
+
+        let targetAudioBitrate: Int64
         if options.removeAudio {
-            assetForExport = try await composeVideoOnlyAsset(from: sourceAsset)
+            targetAudioBitrate = 0
+        } else if let sourceAudioTrack {
+            let sourceAudioBitrate = Int64(try await sourceAudioTrack.load(.estimatedDataRate))
+            targetAudioBitrate = max(options.computeTargetAudioBitrateBps(sourceAudioBitrateBps: sourceAudioBitrate), 32_000)
         } else {
-            assetForExport = sourceAsset
+            targetAudioBitrate = 0
         }
 
-        let sourceSize: CGSize
-        if let sourceTrack {
-            sourceSize = try await loadDisplaySize(for: sourceTrack)
-        } else {
-            sourceSize = .zero
-        }
-        let presetName = exportPreset(for: options, sourceSize: sourceSize)
-
-        guard let exportSession = AVAssetExportSession(asset: assetForExport, presetName: presetName) else {
-            throw VideoCompressionError.exportSessionCreationFailed
-        }
-
+        let outputFileType = outputFileType(for: options)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("compressed-\(UUID().uuidString)")
-            .appendingPathExtension(options.videoCodec == .h265 ? "mov" : "mp4")
+            .appendingPathExtension(outputFileType.fileExtension)
 
         if FileManager.default.fileExists(atPath: outputURL.path) {
             try FileManager.default.removeItem(at: outputURL)
         }
 
-        exportSession.outputURL = outputURL
-        exportSession.shouldOptimizeForNetworkUse = true
-        exportSession.outputFileType = outputFileType(for: options, supportedFileTypes: exportSession.supportedFileTypes)
-
-        let progressTask = Task {
-            while !Task.isCancelled {
-                progressHandler(exportSession.progress)
-                try? await Task.sleep(for: .milliseconds(150))
-            }
+        guard let reader = try? AVAssetReader(asset: sourceAsset) else {
+            throw VideoCompressionError.readerCreationFailed
         }
 
-        do {
-            try await exportSession.exportAsync()
-            progressTask.cancel()
-            progressHandler(1.0)
-            return outputURL
-        } catch {
-            progressTask.cancel()
-            throw VideoCompressionError.exportFailed(underlying: error)
-        }
-    }
-
-    private func exportPreset(for options: CompressionOptions, sourceSize: CGSize) -> String {
-        if options.videoCodec == .h265,
-           AVAssetExportSession.allExportPresets().contains(AVAssetExportPresetHEVCHighestQuality) {
-            return AVAssetExportPresetHEVCHighestQuality
+        guard let writer = try? AVAssetWriter(outputURL: outputURL, fileType: outputFileType) else {
+            throw VideoCompressionError.writerCreationFailed
         }
 
-        let targetSize = options.computeTargetResolution(
-            sourceWidth: Int(max(sourceSize.width, 0)),
-            sourceHeight: Int(max(sourceSize.height, 0))
+        let videoComposition = try await makeVideoComposition(
+            for: sourceVideoTrack,
+            duration: duration,
+            sourceSize: sourceSize,
+            renderSize: renderSize,
+            frameRate: targetFrameRate
         )
 
-        let longestEdge = max(targetSize.width, targetSize.height)
-        switch longestEdge {
-        case ..<640:
-            return AVAssetExportPreset640x480
-        case ..<960:
-            return AVAssetExportPreset960x540
-        case ..<1280:
-            return AVAssetExportPreset1280x720
-        case ..<1920:
-            return AVAssetExportPreset1920x1080
-        default:
-            return AVAssetExportPresetHighestQuality
+        let videoOutput = AVAssetReaderVideoCompositionOutput(
+            videoTracks: [sourceVideoTrack],
+            videoSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+            ]
+        )
+        videoOutput.videoComposition = videoComposition
+
+        guard reader.canAdd(videoOutput) else {
+            throw VideoCompressionError.readerCreationFailed
+        }
+        reader.add(videoOutput)
+
+        let videoInput = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: videoOutputSettings(
+                for: options,
+                renderSize: renderSize,
+                bitrate: targetVideoBitrate,
+                frameRate: targetFrameRate
+            )
+        )
+        videoInput.expectsMediaDataInRealTime = false
+
+        guard writer.canAdd(videoInput) else {
+            throw VideoCompressionError.writerCreationFailed
+        }
+        writer.add(videoInput)
+
+        var audioOutput: AVAssetReaderTrackOutput?
+        var audioInput: AVAssetWriterInput?
+
+        if !options.removeAudio, let sourceAudioTrack, targetAudioBitrate > 0 {
+            let configuredAudioOutput = AVAssetReaderTrackOutput(
+                track: sourceAudioTrack,
+                outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM]
+            )
+
+            guard reader.canAdd(configuredAudioOutput) else {
+                throw VideoCompressionError.readerCreationFailed
+            }
+            reader.add(configuredAudioOutput)
+            audioOutput = configuredAudioOutput
+
+            let configuredAudioInput = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: try await audioOutputSettings(for: sourceAudioTrack, bitrate: targetAudioBitrate)
+            )
+            configuredAudioInput.expectsMediaDataInRealTime = false
+
+            guard writer.canAdd(configuredAudioInput) else {
+                throw VideoCompressionError.writerCreationFailed
+            }
+            writer.add(configuredAudioInput)
+            audioInput = configuredAudioInput
+        }
+
+        writer.shouldOptimizeForNetworkUse = true
+
+        return try await transcode(
+            duration: duration,
+            reader: reader,
+            writer: writer,
+            outputURL: outputURL,
+            videoOutput: videoOutput,
+            videoInput: videoInput,
+            audioOutput: audioOutput,
+            audioInput: audioInput,
+            progressHandler: progressHandler
+        )
+    }
+
+    private func transcode(
+        duration: CMTime,
+        reader: AVAssetReader,
+        writer: AVAssetWriter,
+        outputURL: URL,
+        videoOutput: AVAssetReaderVideoCompositionOutput,
+        videoInput: AVAssetWriterInput,
+        audioOutput: AVAssetReaderTrackOutput?,
+        audioInput: AVAssetWriterInput?,
+        progressHandler: @escaping (Float) -> Void
+    ) async throws -> URL {
+        let durationSeconds = max(CMTimeGetSeconds(duration), 0.001)
+        let videoQueue = DispatchQueue(label: "VideoCompressionService.video")
+        let audioQueue = DispatchQueue(label: "VideoCompressionService.audio")
+        let stateQueue = DispatchQueue(label: "VideoCompressionService.state")
+        let readerBox = SendableBox(reader)
+        let writerBox = SendableBox(writer)
+        let videoOutputBox = SendableBox(videoOutput)
+        let videoInputBox = SendableBox(videoInput)
+        let audioOutputBox = audioOutput.map(SendableBox.init)
+        let audioInputBox = audioInput.map(SendableBox.init)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            var hasResumed = false
+            var isFinishing = false
+            var videoFinished = false
+            var audioFinished = audioInputBox == nil
+            var firstError: Error?
+
+            func resolve(_ result: Result<URL, Error>) {
+                stateQueue.sync {
+                    guard !hasResumed else { return }
+                    hasResumed = true
+                    switch result {
+                    case .success(let url):
+                        continuation.resume(returning: url)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+
+            func fail(_ error: Error?) {
+                let resolvedError: Error = stateQueue.sync {
+                    if let firstError {
+                        return firstError
+                    }
+                    let newError = error ?? VideoCompressionError.compressionFailed(underlying: nil)
+                    firstError = newError
+                    return newError
+                }
+                readerBox.value.cancelReading()
+                writerBox.value.cancelWriting()
+                resolve(.failure(resolvedError))
+            }
+
+            func finishIfNeeded() {
+                let shouldFinish: Bool = stateQueue.sync {
+                    guard !hasResumed, !isFinishing, firstError == nil else { return false }
+                    guard videoFinished && audioFinished else { return false }
+                    isFinishing = true
+                    return true
+                }
+
+                guard shouldFinish else { return }
+
+                writerBox.value.finishWriting {
+                    if writerBox.value.status == .completed {
+                        progressHandler(1.0)
+                        resolve(.success(outputURL))
+                    } else {
+                        fail(writerBox.value.error)
+                    }
+                }
+            }
+
+            guard writerBox.value.startWriting() else {
+                fail(writerBox.value.error)
+                return
+            }
+
+            guard readerBox.value.startReading() else {
+                fail(readerBox.value.error)
+                return
+            }
+
+            writerBox.value.startSession(atSourceTime: .zero)
+
+            videoInputBox.value.requestMediaDataWhenReady(on: videoQueue) {
+                while videoInputBox.value.isReadyForMoreMediaData {
+                    if let sampleBuffer = videoOutputBox.value.copyNextSampleBuffer() {
+                        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                        let progress = min(max(Float(CMTimeGetSeconds(presentationTime) / durationSeconds), 0), 0.99)
+                        progressHandler(progress)
+
+                        guard videoInputBox.value.append(sampleBuffer) else {
+                            fail(writerBox.value.error ?? readerBox.value.error)
+                            return
+                        }
+                    } else {
+                        videoInputBox.value.markAsFinished()
+                        stateQueue.sync {
+                            videoFinished = true
+                            if readerBox.value.status == .failed, firstError == nil {
+                                firstError = readerBox.value.error ?? VideoCompressionError.compressionFailed(underlying: nil)
+                            }
+                        }
+                        finishIfNeeded()
+                        return
+                    }
+                }
+            }
+
+            if let audioInputBox, let audioOutputBox {
+                audioInputBox.value.requestMediaDataWhenReady(on: audioQueue) {
+                    while audioInputBox.value.isReadyForMoreMediaData {
+                        if let sampleBuffer = audioOutputBox.value.copyNextSampleBuffer() {
+                            guard audioInputBox.value.append(sampleBuffer) else {
+                                fail(writerBox.value.error ?? readerBox.value.error)
+                                return
+                            }
+                        } else {
+                            audioInputBox.value.markAsFinished()
+                            stateQueue.sync {
+                                audioFinished = true
+                                if readerBox.value.status == .failed, firstError == nil {
+                                    firstError = readerBox.value.error ?? VideoCompressionError.compressionFailed(underlying: nil)
+                                }
+                            }
+                            finishIfNeeded()
+                            return
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private func outputFileType(for options: CompressionOptions, supportedFileTypes: [AVFileType]) -> AVFileType {
-        let preferred: AVFileType = options.videoCodec == .h265 ? .mov : .mp4
-        if supportedFileTypes.contains(preferred) {
-            return preferred
-        }
-        if supportedFileTypes.contains(.mp4) {
-            return .mp4
-        }
-        if supportedFileTypes.contains(.mov) {
-            return .mov
-        }
-        return preferred
+    private func videoOutputSettings(
+        for options: CompressionOptions,
+        renderSize: CGSize,
+        bitrate: Int64,
+        frameRate: Int
+    ) -> [String: Any] {
+        [
+            AVVideoCodecKey: videoCodec(for: options.videoCodec),
+            AVVideoWidthKey: Int(renderSize.width),
+            AVVideoHeightKey: Int(renderSize.height),
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: Int(bitrate),
+                AVVideoExpectedSourceFrameRateKey: frameRate,
+                AVVideoMaxKeyFrameIntervalKey: max(frameRate * 2, 1),
+                AVVideoProfileLevelKey: profileLevel(for: options.videoCodec)
+            ]
+        ]
     }
 
-    private func composeVideoOnlyAsset(from asset: AVAsset) async throws -> AVMutableComposition {
-        let composition = AVMutableComposition()
-        guard
-            let sourceVideoTrack = try await asset.loadTracks(withMediaType: .video).first,
-            let destinationVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
-        else {
-            throw VideoCompressionError.noVideoTrack
+    private func audioOutputSettings(for track: AVAssetTrack, bitrate: Int64) async throws -> [String: Any] {
+        let formatDescriptions = try await track.load(.formatDescriptions)
+        let streamDescription = formatDescriptions
+            .compactMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+            .first
+
+        let sampleRate = streamDescription.map { Int($0.mSampleRate) }.flatMap { $0 > 0 ? $0 : nil } ?? 44_100
+        let channelCount = streamDescription.map { Int($0.mChannelsPerFrame) }.flatMap { $0 > 0 ? $0 : nil } ?? 2
+
+        guard sampleRate > 0, channelCount > 0 else {
+            throw VideoCompressionError.invalidAudioTrack
         }
 
-        let duration = try await asset.load(.duration)
-        try destinationVideoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: sourceVideoTrack, at: .zero)
-        destinationVideoTrack.preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        return [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: channelCount,
+            AVEncoderBitRateKey: Int(bitrate)
+        ]
+    }
 
+    private func makeVideoComposition(
+        for track: AVAssetTrack,
+        duration: CMTime,
+        sourceSize: CGSize,
+        renderSize: CGSize,
+        frameRate: Int
+    ) async throws -> AVMutableVideoComposition {
+        let composition = AVMutableVideoComposition()
+        composition.renderSize = renderSize
+        composition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(frameRate, 1)))
+
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
+
+        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+        let preferredTransform = try await track.load(.preferredTransform)
+        let naturalSize = try await track.load(.naturalSize)
+        let transformedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let orientedSize = CGSize(width: abs(transformedRect.width), height: abs(transformedRect.height))
+        let scale = min(renderSize.width / max(orientedSize.width, 1), renderSize.height / max(orientedSize.height, 1))
+        let scaledRect = CGRect(origin: transformedRect.origin, size: transformedRect.size)
+            .applying(CGAffineTransform(scaleX: scale, y: scale))
+
+        var finalTransform = preferredTransform.concatenating(CGAffineTransform(scaleX: scale, y: scale))
+        finalTransform = finalTransform.concatenating(
+            CGAffineTransform(
+                translationX: (renderSize.width - abs(scaledRect.width)) / 2 - scaledRect.origin.x,
+                y: (renderSize.height - abs(scaledRect.height)) / 2 - scaledRect.origin.y
+            )
+        )
+
+        layerInstruction.setTransform(finalTransform, at: .zero)
+        instruction.layerInstructions = [layerInstruction]
+        composition.instructions = [instruction]
         return composition
+    }
+
+    private func videoCodec(for codec: VideoCodec) -> AVVideoCodecType {
+        switch codec {
+        case .h265:
+            return .hevc
+        case .h264, .av1:
+            return .h264
+        }
+    }
+
+    private func profileLevel(for codec: VideoCodec) -> String {
+        switch codec {
+        case .h265:
+            return kVTProfileLevel_HEVC_Main_AutoLevel as String
+        case .h264, .av1:
+            return AVVideoProfileLevelH264HighAutoLevel
+        }
+    }
+
+    private func outputFileType(for options: CompressionOptions) -> AVFileType {
+        options.videoCodec == .h265 ? .mov : .mp4
     }
 
     private func loadDisplaySize(for track: AVAssetTrack) async throws -> CGSize {
@@ -435,19 +693,49 @@ final class VideoCompressionService {
     }
 }
 
-private extension AVAssetExportSession {
-    func exportAsync() async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            exportAsynchronously {
-                switch self.status {
-                case .completed:
-                    continuation.resume(returning: ())
-                case .failed, .cancelled:
-                    continuation.resume(throwing: self.error ?? VideoCompressionError.exportFailed(underlying: nil))
-                default:
-                    continuation.resume(throwing: VideoCompressionError.exportFailed(underlying: self.error))
-                }
+private final class SendableBox<T>: @unchecked Sendable {
+    let value: T
+
+    init(_ value: T) {
+        self.value = value
+    }
+}
+
+private extension CompressionOptions {
+    func computeRenderSize(sourceSize: CGSize) -> CGSize {
+        let target = computeTargetResolution(
+            sourceWidth: Int(max(sourceSize.width, 0)),
+            sourceHeight: Int(max(sourceSize.height, 0))
+        )
+
+        let resolvedSize: CGSize
+        switch resolutionMode {
+        case .direct:
+            resolvedSize = target
+        case .percentage, .preset:
+            guard sourceSize.width > 0, sourceSize.height > 0, target.width > 0, target.height > 0 else {
+                resolvedSize = target
+                break
             }
+
+            let scale = min(target.width / sourceSize.width, target.height / sourceSize.height)
+            resolvedSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        }
+
+        return CGSize(
+            width: max((Int(resolvedSize.width.rounded()) / 2) * 2, 2),
+            height: max((Int(resolvedSize.height.rounded()) / 2) * 2, 2)
+        )
+    }
+}
+
+private extension AVFileType {
+    var fileExtension: String {
+        switch self {
+        case .mov:
+            return "mov"
+        default:
+            return "mp4"
         }
     }
 }

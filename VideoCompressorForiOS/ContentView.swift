@@ -1,7 +1,10 @@
+import ActivityKit
 import AVFoundation
 import Photos
 import PhotosUI
 import SwiftUI
+import UIKit
+import UserNotifications
 
 private enum ScreenStep {
     case selection
@@ -28,6 +31,20 @@ private enum OptionsTab: Int, CaseIterable, Identifiable {
     }
 }
 
+private actor LiveActivityProgressThrottler {
+    private var lastSentBucket: Int = 0
+
+    init() {}
+
+    func nextProgressToSend(_ progress: Double) -> Double? {
+        let clamped = min(max(progress, 0), 1)
+        let bucket = Int((clamped * 100).rounded(.down)) / 10
+        guard bucket > lastSentBucket else { return nil }
+        lastSentBucket = min(bucket, 10)
+        return Double(lastSentBucket) / 10.0
+    }
+}
+
 struct PickedVideo: Transferable {
     let url: URL
 
@@ -49,6 +66,7 @@ struct PickedVideo: Transferable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedItem: PhotosPickerItem?
     @State private var sourceURL: URL?
     @State private var sourceInfo: VideoInfoSummary?
@@ -56,10 +74,16 @@ struct ContentView: View {
     @State private var sourceFileSizeText = "-"
     @State private var compressedFileSizeText = "-"
     @State private var progress: Float = 0
+    @State private var hasReceivedCompressionProgress = false
     @State private var isCompressing = false
+    @State private var isLoadingSourceVideo = false
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     @State private var saveMessage = ""
+    @State private var showCompressionStartingSpinner = false
+    @State private var sharedVideoURL: URL?
+    @State private var showSharedVideoDuringCompressionAlert = false
+    @State private var compressionBackgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     @State private var currentStep: ScreenStep = .selection
     @State private var selectedTab: OptionsTab = .resolution
@@ -155,36 +179,33 @@ struct ContentView: View {
         return true
     }
 
+    private var activeLoadingMessage: String? {
+        if isLoadingSourceVideo { return "動画を読み込み中…" }
+        return nil
+    }
+
     var body: some View {
-        NavigationStack {
-            GeometryReader { geometry in
-                VStack(alignment: .leading, spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            switch currentStep {
-                            case .selection:
-                                selectionStepContent
-                            case .options:
-                                optionsStepContent
-                            case .progress:
-                                progressStepContent
-                            case .completed:
-                                completedStepContent
-                            }
+        ZStack {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        switch currentStep {
+                        case .selection:
+                            selectionStepContent
+                        case .options:
+                            optionsStepContent
+                        case .progress:
+                            progressStepContent
+                        case .completed:
+                            completedStepContent
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(width: geometry.size.width, alignment: .leading)
-
-                    Divider()
-
-                    bottomButtons
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
+                    .padding(16)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+                .id(currentStep)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color(uiColor: .systemBackground))
                 .navigationTitle("動画圧縮くん")
                 .navigationBarTitleDisplayMode(.inline)
                 .alert("エラー", isPresented: $showErrorAlert) {
@@ -192,34 +213,102 @@ struct ContentView: View {
                 } message: {
                     Text(errorMessage)
                 }
+                .alert("処理中です", isPresented: $showSharedVideoDuringCompressionAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("現在動画を圧縮処理中のため、新しい動画を受け付けることはできません。\n圧縮完了後に再度お試しください。")
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 0) {
+                        Divider()
+
+                        bottomButtons
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(Color(uiColor: .systemBackground))
+                    }
+                }
             }
+            .disabled(activeLoadingMessage != nil)
+
+            if let activeLoadingMessage {
+                loadingDialog(message: activeLoadingMessage)
+                    .zIndex(1000)
+            }
+
+            if currentStep == .progress && showCompressionStartingSpinner {
+                loadingDialog(message: "圧縮準備中…")
+                    .zIndex(1100)
+            }
+        }
+        .onOpenURL { url in
+            if url.scheme == SharedBridge.openURLScheme {
+                importPendingSharedVideoIfNeeded()
+                return
+            }
+            handleSharedURL(url)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            importPendingSharedVideoIfNeeded()
+        }
+        .onAppear {
+            importPendingSharedVideoIfNeeded()
         }
         .task(id: selectedItem) {
             guard let selectedItem else { return }
+            let loadingStartedAt = Date()
+
+            await MainActor.run {
+                isLoadingSourceVideo = true
+                currentStep = .selection
+                sourceURL = nil
+                sourceInfo = nil
+                sourceFileSizeText = "-"
+                compressedURL = nil
+                compressedFileSizeText = "-"
+                compressionFailureMessage = nil
+                saveMessage = ""
+            }
+            await Task.yield()
+
             do {
                 if let pickedVideo = try await selectedItem.loadTransferable(type: PickedVideo.self) {
-                    sourceURL = pickedVideo.url
-                    sourceFileSizeText = readableFileSize(at: pickedVideo.url)
-                    sourceInfo = try await loadVideoInfo(from: pickedVideo.url)
+                    let loadedSourceInfo = try await loadVideoInfo(from: pickedVideo.url)
 
-                    if let sourceInfo {
-                        minTargetSizeMB = Double(SimpleCompressionOptions.computeMinSizeMB(videoInfo: sourceInfo))
-                        maxTargetSizeMB = Double(max(SimpleCompressionOptions.computeMaxSizeMB(videoInfo: sourceInfo), Int(minTargetSizeMB)))
-                        let sourceSizeMB = max(Int(sourceInfo.fileSizeBytes / (1024 * 1024)), 1)
+                    await MainActor.run {
+                        sourceURL = pickedVideo.url
+                        sourceFileSizeText = readableFileSize(at: pickedVideo.url)
+                        sourceInfo = loadedSourceInfo
+
+                        minTargetSizeMB = Double(SimpleCompressionOptions.computeMinSizeMB(videoInfo: loadedSourceInfo))
+                        maxTargetSizeMB = Double(max(SimpleCompressionOptions.computeMaxSizeMB(videoInfo: loadedSourceInfo), Int(minTargetSizeMB)))
+                        let sourceSizeMB = max(Int(loadedSourceInfo.fileSizeBytes / (1024 * 1024)), 1)
                         let defaultTarget = max(Int(minTargetSizeMB), min((sourceSizeMB * 2) / 3, Int(maxTargetSizeMB)))
                         targetSizeMB = Double(defaultTarget)
-                    }
 
-                    videoCodec = supportsHEVC ? .h265 : .h264
-                    removeAudio = false
-                    compressedURL = nil
-                    compressedFileSizeText = "-"
-                    compressionFailureMessage = nil
-                    saveMessage = ""
-                    currentStep = .selection
+                        videoCodec = supportsHEVC ? .h265 : .h264
+                        removeAudio = false
+                        selectedTab = .resolution
+                        currentStep = .selection
+                        self.selectedItem = nil
+                    }
+                    await ensureMinimumDialogDuration(from: loadingStartedAt)
+                    await MainActor.run {
+                        isLoadingSourceVideo = false
+                    }
+                }
+            } catch is CancellationError {
+                await ensureMinimumDialogDuration(from: loadingStartedAt)
+                await MainActor.run {
+                    isLoadingSourceVideo = false
                 }
             } catch {
-                presentError(error)
+                await ensureMinimumDialogDuration(from: loadingStartedAt)
+                await MainActor.run {
+                    isLoadingSourceVideo = false
+                    presentError(error)
+                }
             }
         }
     }
@@ -456,15 +545,17 @@ struct ContentView: View {
         card {
             VStack(spacing: 16) {
                 if isCompressing {
-                    ZStack {
-                        CircularProgressView(progress: progress)
-                            .frame(width: 160, height: 160)
-                        Text("圧縮処理中")
-                            .font(.subheadline)
-                    }
+                    //if hasReceivedCompressionProgress {
+                        ZStack {
+                            CircularProgressView(progress: progress)
+                                .frame(width: 160, height: 160)
+                            Text("圧縮処理中")
+                                .font(.subheadline)
+                        }
 
-                    Text("\(Int(progress * 100))%")
-                        .font(.title3)
+                        Text("\(Int(progress * 100))%")
+                            .font(.title3)
+                    //}
                 } else if let compressionFailureMessage {
                     Text("✕")
                         .font(.system(size: 88, weight: .bold))
@@ -622,28 +713,93 @@ struct ContentView: View {
     private func compressVideo() async {
         guard let sourceURL else { return }
 
+        beginCompressionBackgroundTask()
+        defer {
+            endCompressionBackgroundTask()
+            SharedBridge.setCompressionRunning(false)
+        }
+
         isCompressing = true
+        hasReceivedCompressionProgress = false
+        SharedBridge.setCompressionRunning(true)
         compressionFailureMessage = nil
         currentStep = .progress
         progress = 0
         saveMessage = ""
 
+        showCompressionStartingSpinner = true
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 450_000_000)
+
+        let fileName = sourceURL.lastPathComponent
+        let sourceFileSize = (try? sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+        let estimatedSize = Int64(currentOptions.computeEstimatedSizeBytes(videoInfo: sourceInfo))
+
+        var liveActivity: Activity<CompressionActivity>?
+        let liveActivityThrottler = LiveActivityProgressThrottler()
+        if #available(iOS 16.2, *), ActivityAuthorizationInfo().areActivitiesEnabled {
+            let attributes = CompressionActivity(
+                sourceFileName: fileName,
+                sourceFileSizeBytes: sourceFileSize,
+                estimatedSizeBytes: estimatedSize
+            )
+            do {
+                let createdActivity = try Activity<CompressionActivity>.request(
+                    attributes: attributes,
+                    contentState: CompressionActivity.ContentState(progress: 0, status: "準備中"),
+                    pushType: nil
+                )
+                liveActivity = createdActivity
+            } catch {
+                print("Failed to start Live Activity: \(error)")
+            }
+        }
+
+        showCompressionStartingSpinner = false
+
         do {
             let resultURL = try await compressor.compress(inputURL: sourceURL, options: currentOptions) { currentProgress in
                 Task { @MainActor in
-                    progress = currentProgress
+                    progress = max(progress, currentProgress)
+                    if currentProgress > 0.001 {
+                        hasReceivedCompressionProgress = true
+                    }
+
+                    if #available(iOS 16.2, *), let liveActivity {
+                        Task {
+                            guard let nextProgress = await liveActivityThrottler.nextProgressToSend(Double(currentProgress)) else { return }
+                            let contentState = CompressionActivity.ContentState(
+                                progress: nextProgress,
+                                status: "圧縮中"
+                            )
+                            await liveActivity.update(using: contentState)
+                        }
+                    }
                 }
             }
+
+            if #available(iOS 16.2, *), let liveActivity {
+                await liveActivity.end(using: CompressionActivity.ContentState(progress: 1.0, status: "完了"), dismissalPolicy: .immediate)
+            }
+
             compressedURL = resultURL
             compressedFileSizeText = readableFileSize(at: resultURL)
             currentStep = .completed
+
+            await sendNotification()
         } catch {
+            showCompressionStartingSpinner = false
+            if #available(iOS 16.2, *), let liveActivity {
+                await liveActivity.end(using: CompressionActivity.ContentState(progress: Double(progress), status: "失敗"), dismissalPolicy: .immediate)
+            }
+
             compressionFailureMessage = error.localizedDescription
             currentStep = .progress
             presentError(error)
         }
 
         isCompressing = false
+        hasReceivedCompressionProgress = false
     }
 
     @MainActor
@@ -754,6 +910,164 @@ struct ContentView: View {
     private func presentError(_ error: Error) {
         errorMessage = error.localizedDescription
         showErrorAlert = true
+    }
+
+    private func loadingDialog() -> some View {
+        loadingDialog(message: "圧縮準備中…")
+    }
+
+    private func loadingDialog(message: String) -> some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.5, anchor: .center)
+                Text(message)
+                    .foregroundStyle(.primary)
+            }
+            .padding(24)
+            .background(Color(uiColor: .systemBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    private func ensureMinimumDialogDuration(from start: Date) async {
+        let minimum: TimeInterval = 0.8
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed < minimum else { return }
+        let remaining = minimum - elapsed
+        try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+    }
+
+    private func handleSharedURL(_ url: URL) {
+        let hasScopedAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasScopedAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        guard !url.hasDirectoryPath else {
+            presentError(VideoCompressionError.noVideoTrack)
+            return
+        }
+
+        guard url.pathExtension.lowercased() == "mp4" || url.pathExtension.lowercased() == "mov" || url.pathExtension.lowercased() == "m4v" else {
+            presentError(VideoCompressionError.noVideoTrack)
+            return
+        }
+
+        if isCompressing {
+            showSharedVideoDuringCompressionAlert = true
+            return
+        }
+
+        Task {
+            do {
+                let copiedURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("shared-\(UUID().uuidString)")
+                    .appendingPathExtension(url.pathExtension)
+
+                try FileManager.default.copyItem(at: url, to: copiedURL)
+
+                await MainActor.run {
+                    isLoadingSourceVideo = true
+                    currentStep = .selection
+                    sourceURL = nil
+                    sourceInfo = nil
+                    sourceFileSizeText = "-"
+                    compressedURL = nil
+                    compressedFileSizeText = "-"
+                    compressionFailureMessage = nil
+                    saveMessage = ""
+                }
+
+                let loadedSourceInfo = try await loadVideoInfo(from: copiedURL)
+
+                await MainActor.run {
+                    sourceURL = copiedURL
+                    sourceFileSizeText = readableFileSize(at: copiedURL)
+                    sourceInfo = loadedSourceInfo
+
+                    minTargetSizeMB = Double(SimpleCompressionOptions.computeMinSizeMB(videoInfo: loadedSourceInfo))
+                    maxTargetSizeMB = Double(max(SimpleCompressionOptions.computeMaxSizeMB(videoInfo: loadedSourceInfo), Int(minTargetSizeMB)))
+                    let sourceSizeMB = max(Int(loadedSourceInfo.fileSizeBytes / (1024 * 1024)), 1)
+                    let defaultTarget = max(Int(minTargetSizeMB), min((sourceSizeMB * 2) / 3, Int(maxTargetSizeMB)))
+                    targetSizeMB = Double(defaultTarget)
+
+                    videoCodec = supportsHEVC ? .h265 : .h264
+                    removeAudio = false
+                    selectedTab = .resolution
+                    currentStep = .selection
+                    isLoadingSourceVideo = false
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    isLoadingSourceVideo = false
+                }
+            } catch {
+                await MainActor.run {
+                    isLoadingSourceVideo = false
+                    presentError(error)
+                }
+            }
+        }
+    }
+
+    private func importPendingSharedVideoIfNeeded() {
+        if SharedBridge.consumeRejectedBecauseBusy() {
+            showSharedVideoDuringCompressionAlert = true
+        }
+
+        guard let pendingURL = SharedBridge.consumeIncomingVideoURL() else { return }
+
+        if isCompressing || SharedBridge.isCompressionRunning() {
+            showSharedVideoDuringCompressionAlert = true
+            return
+        }
+
+        handleSharedURL(pendingURL)
+    }
+
+    private func sendNotification() async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+
+        if settings.authorizationStatus != .authorized && settings.authorizationStatus != .provisional {
+            let granted = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            guard granted == true else { return }
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "動画圧縮が完了しました"
+        content.body = "タップして確認"
+        content.sound = .default
+        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+        content.userInfo = ["compressionCompleted": true]
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "CompressionComplete", content: content, trigger: trigger)
+
+        try? await center.add(request)
+    }
+
+    @MainActor
+    private func beginCompressionBackgroundTask() {
+        endCompressionBackgroundTask()
+        compressionBackgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "VideoCompression") {
+            Task { @MainActor in
+                endCompressionBackgroundTask()
+            }
+        }
+    }
+
+    @MainActor
+    private func endCompressionBackgroundTask() {
+        guard compressionBackgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(compressionBackgroundTaskID)
+        compressionBackgroundTaskID = .invalid
     }
 }
 
