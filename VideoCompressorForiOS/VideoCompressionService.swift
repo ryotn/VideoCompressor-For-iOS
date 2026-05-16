@@ -80,7 +80,7 @@ final class VideoCompressionService {
         }
 
         do {
-            try await exportSession.export()
+            try await exportSession.exportAsync()
             progressTask.cancel()
             progressHandler(1.0)
             return outputURL
@@ -124,7 +124,7 @@ final class VideoCompressionService {
 }
 
 private extension AVAssetExportSession {
-    func export() async throws {
+    func exportAsync() async throws {
         try await withCheckedThrowingContinuation { continuation in
             exportAsynchronously {
                 switch self.status {
