@@ -157,42 +157,45 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("VideoCompressor")
-                            .font(.title)
-                            .bold()
+            GeometryReader { geometry in
+                VStack(alignment: .leading, spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("VideoCompressor")
+                                .font(.title)
+                                .bold()
 
-                        switch currentStep {
-                        case .selection:
-                            selectionStepContent
-                        case .options:
-                            optionsStepContent
-                        case .progress:
-                            progressStepContent
-                        case .completed:
-                            completedStepContent
+                            switch currentStep {
+                            case .selection:
+                                selectionStepContent
+                            case .options:
+                                optionsStepContent
+                            case .progress:
+                                progressStepContent
+                            case .completed:
+                                completedStepContent
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
+                    .frame(width: geometry.size.width, alignment: .leading)
+
+                    Divider()
+
+                    bottomButtons
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
                 }
-                .frame(maxWidth: .infinity)
-
-                Divider()
-
-                bottomButtons
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .navigationTitle("動画圧縮くん")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("エラー", isPresented: $showErrorAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+                .navigationTitle("動画圧縮くん")
+                .navigationBarTitleDisplayMode(.inline)
+                .alert("エラー", isPresented: $showErrorAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(errorMessage)
+                }
             }
         }
         .task(id: selectedItem) {
