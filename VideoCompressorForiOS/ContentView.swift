@@ -765,7 +765,7 @@ private struct CircularProgressView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
 
             Circle()
-                .trim(from: 0, to: min(max(progress, 0), 1))
+                .trim(from: 0, to: min(max(CGFloat(progress), 0), 1))
                 .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
