@@ -157,7 +157,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("VideoCompressor")
@@ -178,10 +178,12 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
                 }
+                .frame(maxWidth: .infinity)
 
                 Divider()
 
                 bottomButtons
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
