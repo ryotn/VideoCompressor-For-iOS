@@ -206,7 +206,7 @@ class MainViewModel {
         Task {
             let finalContentState = activity.content.state
             let finalContent = ActivityContent(state: finalContentState, staleDate: nil)
-            await activity.end(finalContent, dismissalPolicy: .default)
+            await activity.end(finalContent, dismissalPolicy: .immediate)
         }
     }
 
