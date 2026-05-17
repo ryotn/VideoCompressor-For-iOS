@@ -129,16 +129,17 @@ class MainViewModel {
             ) { [weak self] progress in
                 Task { @MainActor in
                     guard let self = self else { return }
-                    let progressPercent = Double(progress * 100.0)
+                    let progressPercent = progress * 100.0
                     if case .inProgress(_, let elapsed) = self.compressionState {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: elapsed)
                     } else {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: 0)
                     }
 
-                    if progressPercent - self.lastReportedProgress >= 10.0 || progressPercent >= 100.0 {
-                        self.lastReportedProgress = progressPercent
-                        self.updateLiveActivity(progress: progressPercent, fileName: info.displayName)
+                    let progressPercentDouble = Double(progressPercent)
+                    if progressPercentDouble - self.lastReportedProgress >= 10.0 || progressPercentDouble >= 100.0 {
+                        self.lastReportedProgress = progressPercentDouble
+                        self.updateLiveActivity(progress: progressPercentDouble, fileName: info.displayName)
                     }
                 }
             }
