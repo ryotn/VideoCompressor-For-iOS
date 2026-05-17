@@ -1,0 +1,522 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07F0E7DC3049C665C5FE01D8 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 5C39CF1A2DFD0747371E213A /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0E240A637D688AE51A7F7FB9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
+		1052D51B21E5D27CBA6B28EF /* MainScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */; };
+		1D88798119EB60482025F066 /* VideoCompressorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B9C841ACBD0C97034D79CC0 /* VideoCompressorApp.swift */; };
+		2DA369699F441CA48C3605F8 /* CompressionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DB9D06702BFDA371897ECA /* CompressionState.swift */; };
+		436AA471237E4F13CA256F3D /* CompressionOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881D3022260B18AD3F09E89 /* CompressionOptions.swift */; };
+		475C3F14414A3232341EDF85 /* VideoInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28703CD5B085F138D571DB11 /* VideoInfo.swift */; };
+		961B4E01D7B7359EB65E3BC0 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
+		B50D3CFABF443C9E204DCF2F /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EB936A524734030E09219F /* MainViewModel.swift */; };
+		D7B3F38AF0A433774BF5FA9F /* VideoTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */; };
+		FB94359B3029DE6A572CB474 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DFCFCD096B486A5926E11B /* ShareViewController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		81424A30874D61887D20AB10 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 340E0940066587596FFA0206 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 86CF12A55F722E90DE6F5AE1;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		646B84857AA4AA3125978D07 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				07F0E7DC3049C665C5FE01D8 /* ShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0C85F63732282D488727BFA4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		144E4EE411B57736A19C400F /* VideoCompressor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VideoCompressor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1B9C841ACBD0C97034D79CC0 /* VideoCompressorApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorApp.swift; sourceTree = "<group>"; };
+		28703CD5B085F138D571DB11 /* VideoInfo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoInfo.swift; sourceTree = "<group>"; };
+		45DFCFCD096B486A5926E11B /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		5C39CF1A2DFD0747371E213A /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		78EB936A524734030E09219F /* MainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
+		A3DB9D06702BFDA371897ECA /* CompressionState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionState.swift; sourceTree = "<group>"; };
+		A881D3022260B18AD3F09E89 /* CompressionOptions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionOptions.swift; sourceTree = "<group>"; };
+		B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoTranscoder.swift; sourceTree = "<group>"; };
+		ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainScreen.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1E2BFE7A507C93FAB3E2B068 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0E240A637D688AE51A7F7FB9 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		316059CA150A7E0E43A39664 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				961B4E01D7B7359EB65E3BC0 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2ADA47C8631228B461855687 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A881D3022260B18AD3F09E89 /* CompressionOptions.swift */,
+				A3DB9D06702BFDA371897ECA /* CompressionState.swift */,
+				28703CD5B085F138D571DB11 /* VideoInfo.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2D8DF67A282732E5A21AAED9 /* VideoCompressor */ = {
+			isa = PBXGroup;
+			children = (
+				2ADA47C8631228B461855687 /* Models */,
+				8E5C65BDCAE6A8BFCCAFBE2C /* Resources */,
+				9AB01503AAAD2E9C856850BC /* Utilities */,
+				1B9C841ACBD0C97034D79CC0 /* VideoCompressorApp.swift */,
+				37F9C96F49180123F40990CE /* ViewModels */,
+				C8CA124236FA55E07E5BEB82 /* Views */,
+			);
+			path = VideoCompressor;
+			sourceTree = "<group>";
+		};
+		36707667B11C5E2E6AB054B9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				144E4EE411B57736A19C400F /* VideoCompressor.app */,
+				5C39CF1A2DFD0747371E213A /* ShareExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		37F9C96F49180123F40990CE /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				78EB936A524734030E09219F /* MainViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		66953914F63A96456A4A10A9 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				45DFCFCD096B486A5926E11B /* ShareViewController.swift */,
+			);
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
+		7EC8C931E0AD76B55B404E7F = {
+			isa = PBXGroup;
+			children = (
+				36707667B11C5E2E6AB054B9 /* Products */,
+				CD77CBD7AEEB94AC0E727B46 /* Frameworks */,
+				2D8DF67A282732E5A21AAED9 /* VideoCompressor */,
+				66953914F63A96456A4A10A9 /* ShareExtension */,
+			);
+			sourceTree = "<group>";
+		};
+		8E5C65BDCAE6A8BFCCAFBE2C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		9AB01503AAAD2E9C856850BC /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		C652FBE74ADFE479DBC36B4B /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0C85F63732282D488727BFA4 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		C8CA124236FA55E07E5BEB82 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		CD77CBD7AEEB94AC0E727B46 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C652FBE74ADFE479DBC36B4B /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0A16484B2B1EEB0AF5103189 /* VideoCompressor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1FBA2AF699CA8DE3008170A3 /* Build configuration list for PBXNativeTarget "VideoCompressor" */;
+			buildPhases = (
+				3F40B455489DEF4AA3B1236A /* Sources */,
+				1E2BFE7A507C93FAB3E2B068 /* Frameworks */,
+				80202328B6C98CB657FC3BCF /* Resources */,
+				646B84857AA4AA3125978D07 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				232A1765F5694B8332C228D4 /* PBXTargetDependency */,
+			);
+			name = VideoCompressor;
+			productName = VideoCompressor;
+			productReference = 144E4EE411B57736A19C400F /* VideoCompressor.app */;
+			productType = "com.apple.product-type.application";
+		};
+		86CF12A55F722E90DE6F5AE1 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EED648E42D8EF69B36584914 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				8BCDDAF37D5BD021F549B6BB /* Sources */,
+				316059CA150A7E0E43A39664 /* Frameworks */,
+				194B3219EED5EA233A94570C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			productName = ShareExtension;
+			productReference = 5C39CF1A2DFD0747371E213A /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		340E0940066587596FFA0206 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					0A16484B2B1EEB0AF5103189 = {
+						DevelopmentTeam = EDDF2QFFRU;
+					};
+					86CF12A55F722E90DE6F5AE1 = {
+						DevelopmentTeam = EDDF2QFFRU;
+					};
+				};
+			};
+			buildConfigurationList = 85F1E024C1D6C8A1E7EF7377 /* Build configuration list for PBXProject "VideoCompressor" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 7EC8C931E0AD76B55B404E7F;
+			productRefGroup = 36707667B11C5E2E6AB054B9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0A16484B2B1EEB0AF5103189 /* VideoCompressor */,
+				86CF12A55F722E90DE6F5AE1 /* ShareExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		194B3219EED5EA233A94570C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		80202328B6C98CB657FC3BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3F40B455489DEF4AA3B1236A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				436AA471237E4F13CA256F3D /* CompressionOptions.swift in Sources */,
+				2DA369699F441CA48C3605F8 /* CompressionState.swift in Sources */,
+				475C3F14414A3232341EDF85 /* VideoInfo.swift in Sources */,
+				D7B3F38AF0A433774BF5FA9F /* VideoTranscoder.swift in Sources */,
+				1D88798119EB60482025F066 /* VideoCompressorApp.swift in Sources */,
+				B50D3CFABF443C9E204DCF2F /* MainViewModel.swift in Sources */,
+				1052D51B21E5D27CBA6B28EF /* MainScreen.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8BCDDAF37D5BD021F549B6BB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FB94359B3029DE6A572CB474 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		232A1765F5694B8332C228D4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShareExtension;
+			target = 86CF12A55F722E90DE6F5AE1 /* ShareExtension */;
+			targetProxy = 81424A30874D61887D20AB10 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		00200D4DF33D4D09FA18F51D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor.ShareExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0880F14EFDE9E9CD330937DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		5CDB30493621DF9E8E6AA2ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = VideoCompressor/VideoCompressor.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
+				INFOPLIST_FILE = VideoCompressor/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5E580783FE57B1EC35DDB308 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CC497223E0F4DEFC452949EB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor.ShareExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		CC83F6592096EA73A09DBE65 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = VideoCompressor/VideoCompressor.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
+				INFOPLIST_FILE = VideoCompressor/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1FBA2AF699CA8DE3008170A3 /* Build configuration list for PBXNativeTarget "VideoCompressor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC83F6592096EA73A09DBE65 /* Release */,
+				5CDB30493621DF9E8E6AA2ED /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		85F1E024C1D6C8A1E7EF7377 /* Build configuration list for PBXProject "VideoCompressor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0880F14EFDE9E9CD330937DD /* Debug */,
+				5E580783FE57B1EC35DDB308 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EED648E42D8EF69B36584914 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC497223E0F4DEFC452949EB /* Release */,
+				00200D4DF33D4D09FA18F51D /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 340E0940066587596FFA0206 /* Project object */;
+}
