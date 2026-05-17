@@ -9,8 +9,10 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
             // User tapped the notification
-            DispatchQueue.main.async {
-                self.onNotificationTapped?()
+            Task {
+                await MainActor.run {
+                    self.onNotificationTapped?()
+                }
             }
         }
         completionHandler()
@@ -27,7 +29,6 @@ struct VideoCompressorApp: App {
     @State private var mainViewModel = MainViewModel()
 
     init() {
-        requestNotificationPermission()
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
 
@@ -42,14 +43,6 @@ struct VideoCompressorApp: App {
                         // For now, if the state is completed, it should already be on the completed screen.
                     }
                 }
-        }
-    }
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error.localizedDescription)")
-            }
         }
     }
 }

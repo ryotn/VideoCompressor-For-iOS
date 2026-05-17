@@ -115,6 +115,8 @@ class MainViewModel {
 
         compressionState = .preparing
         self.lastReportedProgress = 0.0
+
+        requestNotificationPermission()
         startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
@@ -175,9 +177,10 @@ class MainViewModel {
 
     private func startLiveActivity(fileName: String) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard liveActivity == nil else { return }
 
-        let initialContentState = CompressionAttributes.ContentState(progressPercent: 0.0, fileName: fileName)
-        let activityAttributes = CompressionAttributes(totalSizeMb: nil)
+        let initialContentState = CompressionAttributes.ContentState(progressPercent: 0.0)
+        let activityAttributes = CompressionAttributes(fileName: fileName, totalSizeMb: nil)
 
         let activityContent = ActivityContent(state: initialContentState, staleDate: nil)
 
@@ -190,7 +193,7 @@ class MainViewModel {
 
     private func updateLiveActivity(progress: Double, fileName: String) {
         guard let liveActivity = liveActivity else { return }
-        let updatedContentState = CompressionAttributes.ContentState(progressPercent: progress, fileName: fileName)
+        let updatedContentState = CompressionAttributes.ContentState(progressPercent: progress)
         let updatedContent = ActivityContent(state: updatedContentState, staleDate: nil)
         Task {
             await liveActivity.update(updatedContent)
@@ -198,11 +201,12 @@ class MainViewModel {
     }
 
     private func endLiveActivity() {
-        guard let liveActivity = liveActivity else { return }
+        guard let activity = liveActivity else { return }
+        liveActivity = nil
         Task {
-            let finalContentState = liveActivity.content.state
+            let finalContentState = activity.content.state
             let finalContent = ActivityContent(state: finalContentState, staleDate: nil)
-            await liveActivity.end(finalContent, dismissalPolicy: .default)
+            await activity.end(finalContent, dismissalPolicy: .default)
         }
     }
 
@@ -216,6 +220,14 @@ class MainViewModel {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Failed to send notification: \(error)")
+            }
+        }
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error.localizedDescription)")
             }
         }
     }

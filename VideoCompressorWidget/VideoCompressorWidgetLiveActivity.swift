@@ -19,7 +19,7 @@ struct VideoCompressorWidgetLiveActivity: Widget {
                         .foregroundColor(.blue)
                 }
 
-                Text(context.state.fileName)
+                Text(context.attributes.fileName)
                     .font(.subheadline)
                     .lineLimit(1)
                     .foregroundColor(.secondary)
@@ -46,7 +46,7 @@ struct VideoCompressorWidgetLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading) {
-                        Text(context.state.fileName)
+                        Text(context.attributes.fileName)
                             .font(.caption)
                             .lineLimit(1)
                             .foregroundColor(.secondary)
@@ -65,7 +65,7 @@ struct VideoCompressorWidgetLiveActivity: Widget {
                 Image(systemName: "film")
                     .foregroundColor(.blue)
             }
-            .widgetURL(URL(string: "http://www.apple.com"))
+            .widgetURL(URL(string: "videocompressor://"))
             .keylineTint(Color.blue)
         }
     }
