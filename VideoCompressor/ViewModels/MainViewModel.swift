@@ -116,7 +116,6 @@ class MainViewModel {
         compressionState = .preparing
         self.lastReportedProgress = 0.0
 
-        requestNotificationPermission()
         startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
@@ -220,14 +219,6 @@ class MainViewModel {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Failed to send notification: \(error)")
-            }
-        }
-    }
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error.localizedDescription)")
             }
         }
     }

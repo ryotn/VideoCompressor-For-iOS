@@ -29,6 +29,7 @@ struct VideoCompressorApp: App {
     @State private var mainViewModel = MainViewModel()
 
     init() {
+        requestNotificationPermission()
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
 
@@ -43,6 +44,14 @@ struct VideoCompressorApp: App {
                         // For now, if the state is completed, it should already be on the completed screen.
                     }
                 }
+        }
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error.localizedDescription)")
+            }
         }
     }
 }
