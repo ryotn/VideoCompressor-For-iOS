@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import SwiftUI
 import PhotosUI
+import ActivityKit
 
 @Observable
 class MainViewModel {
@@ -14,6 +15,8 @@ class MainViewModel {
 
     private var currentTranscoder: VideoTranscoder?
     private var transcodeTask: Task<Void, Never>?
+    private var liveActivity: Activity<CompressionAttributes>?
+    private var lastReportedProgress: Double = 0.0
 
     // Supported codecs (only checking what hardware supports is ideal, but let's assume standard ones are available)
     let supportedVideoCodecs: [VideoCodec] = [.h264, .h265]
@@ -111,6 +114,8 @@ class MainViewModel {
         }
 
         compressionState = .preparing
+        self.lastReportedProgress = 0.0
+        startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
             let transcoder = VideoTranscoder(
@@ -129,6 +134,11 @@ class MainViewModel {
                     } else {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: 0)
                     }
+
+                    if progressPercent - self.lastReportedProgress >= 10.0 || progressPercent == 100.0 {
+                        self.lastReportedProgress = progressPercent
+                        self.updateLiveActivity(progress: progressPercent, fileName: info.displayName)
+                    }
                 }
             }
 
@@ -140,20 +150,72 @@ class MainViewModel {
                     let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
                     Task { @MainActor in
                         self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
+                        self.endLiveActivity()
+                        self.sendCompletionNotification(fileName: info.displayName)
                     }
                 } else if transcoder.isCancelled {
                     Task { @MainActor in
                         self.compressionState = .cancelled
+                        self.endLiveActivity()
                     }
                 } else {
                     Task { @MainActor in
                         self.compressionState = .failed(error: "Compression failed.")
+                        self.endLiveActivity()
                     }
                 }
             } catch {
                 Task { @MainActor in
                     self.compressionState = .failed(error: error.localizedDescription)
+                    self.endLiveActivity()
                 }
+            }
+        }
+    }
+
+    private func startLiveActivity(fileName: String) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let initialContentState = CompressionAttributes.ContentState(progressPercent: 0.0, fileName: fileName)
+        let activityAttributes = CompressionAttributes(totalSizeMb: nil)
+
+        let activityContent = ActivityContent(state: initialContentState, staleDate: nil)
+
+        do {
+            liveActivity = try Activity.request(attributes: activityAttributes, content: activityContent)
+        } catch {
+            print("Failed to start Live Activity: \(error)")
+        }
+    }
+
+    private func updateLiveActivity(progress: Double, fileName: String) {
+        guard let liveActivity = liveActivity else { return }
+        let updatedContentState = CompressionAttributes.ContentState(progressPercent: progress, fileName: fileName)
+        let updatedContent = ActivityContent(state: updatedContentState, staleDate: nil)
+        Task {
+            await liveActivity.update(updatedContent)
+        }
+    }
+
+    private func endLiveActivity() {
+        guard let liveActivity = liveActivity else { return }
+        Task {
+            let finalContentState = liveActivity.content.state
+            let finalContent = ActivityContent(state: finalContentState, staleDate: nil)
+            await liveActivity.end(finalContent, dismissalPolicy: .default)
+        }
+    }
+
+    private func sendCompletionNotification(fileName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Compression Complete"
+        content.body = "Finished compressing \(fileName)."
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to send notification: \(error)")
             }
         }
     }
