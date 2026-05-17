@@ -116,6 +116,7 @@ class MainViewModel {
         compressionState = .preparing
         self.lastReportedProgress = 0.0
 
+        clearNotifications()
         startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
@@ -224,6 +225,24 @@ class MainViewModel {
         }
     }
 
+    func clearNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.removeAllDeliveredNotifications()
+        center.removeAllPendingNotificationRequests()
+
+        if #available(iOS 16.0, *) {
+            center.setBadgeCount(0) { error in
+                if let error = error {
+                    print("Failed to clear badge count: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            DispatchQueue.main.async {
+                UIApplication.shared.applicationIconBadgeNumber = 0
+            }
+        }
+    }
+
     func cancelCompression() {
         currentTranscoder?.isCancelled = true
         transcodeTask?.cancel()
@@ -231,6 +250,7 @@ class MainViewModel {
 
     func resetState() {
         compressionState = .idle
+        clearNotifications()
     }
 
     private func clearPreviousOutputFiles() {
