@@ -154,28 +154,28 @@ class MainViewModel {
             do {
                 let success = try await transcoder.transcode()
                 if success {
+                    self.sendCompletionNotification(fileName: info.displayName)
                     let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
                     Task { @MainActor in
                         self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
-                        self.endLiveActivity()
-                        self.sendCompletionNotification(fileName: info.displayName)
                     }
+                    self.endLiveActivity()
                 } else if transcoder.isCancelled {
                     Task { @MainActor in
                         self.compressionState = .cancelled
-                        self.endLiveActivity()
                     }
+                    self.endLiveActivity()
                 } else {
                     Task { @MainActor in
                         self.compressionState = .failed(error: "Compression failed.")
-                        self.endLiveActivity()
                     }
+                    self.endLiveActivity()
                 }
             } catch {
                 Task { @MainActor in
                     self.compressionState = .failed(error: error.localizedDescription)
-                    self.endLiveActivity()
                 }
+                self.endLiveActivity()
             }
         }
     }
