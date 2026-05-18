@@ -19,6 +19,7 @@
 		30BD66BB2EE89BA56FDE9B2F /* VideoCompressorWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */; };
 		436AA471237E4F13CA256F3D /* CompressionOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881D3022260B18AD3F09E89 /* CompressionOptions.swift */; };
 		475C3F14414A3232341EDF85 /* VideoInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28703CD5B085F138D571DB11 /* VideoInfo.swift */; };
+		94E342A494A6372EFB60485A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BAAF438B9A0398093F042A49 /* Assets.xcassets */; };
 		961B4E01D7B7359EB65E3BC0 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
 		B50D3CFABF443C9E204DCF2F /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EB936A524734030E09219F /* MainViewModel.swift */; };
 		D7B3F38AF0A433774BF5FA9F /* VideoTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */; };
@@ -65,6 +66,7 @@
 		A8E8EC08D52BEE6B4BEEA276 /* CompressionAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionAttributes.swift; sourceTree = "<group>"; };
 		B68726B1F0FBA8344BC91F20 /* VideoCompressorWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorWidgetBundle.swift; sourceTree = "<group>"; };
 		B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoTranscoder.swift; sourceTree = "<group>"; };
+		BAAF438B9A0398093F042A49 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = VideoCompressor/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VideoCompressorWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCE213DC1FD821A072068A99 /* VideoCompressorWidgetLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainScreen.swift; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 				2D8DF67A282732E5A21AAED9 /* VideoCompressor */,
 				66953914F63A96456A4A10A9 /* ShareExtension */,
 				D93439C2AAB2519479E72C7B /* VideoCompressorWidget */,
+				BAAF438B9A0398093F042A49 /* Assets.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -314,6 +317,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94E342A494A6372EFB60485A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -544,7 +548,7 @@
 				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.ryotn.VideoCompressor.VideoCompressorWidgetExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor.VideoCompressorWidgetExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -582,7 +586,7 @@
 				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.ryotn.VideoCompressor.VideoCompressorWidgetExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryotn.VideoCompressor.VideoCompressorWidgetExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
