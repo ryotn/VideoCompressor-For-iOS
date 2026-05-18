@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import SwiftUI
 import PhotosUI
+import ActivityKit
 
 @Observable
 class MainViewModel {
@@ -14,9 +15,15 @@ class MainViewModel {
 
     private var currentTranscoder: VideoTranscoder?
     private var transcodeTask: Task<Void, Never>?
+    private var liveActivity: Activity<CompressionAttributes>?
+    private var lastReportedProgress: Double = 0.0
 
     // Supported codecs (only checking what hardware supports is ideal, but let's assume standard ones are available)
     let supportedVideoCodecs: [VideoCodec] = [.h264, .h265]
+
+    init() {
+        clearNotifications()
+    }
 
     func updateOptions(_ options: CompressionOptions) {
         self.compressionOptions = options
@@ -111,6 +118,10 @@ class MainViewModel {
         }
 
         compressionState = .preparing
+        self.lastReportedProgress = 0.0
+
+        clearNotifications()
+        startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
             let transcoder = VideoTranscoder(
@@ -123,11 +134,17 @@ class MainViewModel {
             ) { [weak self] progress in
                 Task { @MainActor in
                     guard let self = self else { return }
-                    let progressPercent = progress * 100
+                    let progressPercent = progress * 100.0
                     if case .inProgress(_, let elapsed) = self.compressionState {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: elapsed)
                     } else {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: 0)
+                    }
+
+                    let progressPercentDouble = Double(progressPercent)
+                    if progressPercentDouble - self.lastReportedProgress >= 10.0 || progressPercentDouble >= 100.0 {
+                        self.lastReportedProgress = progressPercentDouble
+                        self.updateLiveActivity(progress: progressPercentDouble, fileName: info.displayName)
                     }
                 }
             }
@@ -137,23 +154,95 @@ class MainViewModel {
             do {
                 let success = try await transcoder.transcode()
                 if success {
+                    self.sendCompletionNotification(fileName: info.displayName)
                     let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
                     Task { @MainActor in
                         self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
                     }
+                    self.endLiveActivity()
                 } else if transcoder.isCancelled {
                     Task { @MainActor in
                         self.compressionState = .cancelled
                     }
+                    self.endLiveActivity()
                 } else {
                     Task { @MainActor in
                         self.compressionState = .failed(error: "Compression failed.")
                     }
+                    self.endLiveActivity()
                 }
             } catch {
                 Task { @MainActor in
                     self.compressionState = .failed(error: error.localizedDescription)
                 }
+                self.endLiveActivity()
+            }
+        }
+    }
+
+    private func startLiveActivity(fileName: String) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard liveActivity == nil else { return }
+
+        let initialContentState = CompressionAttributes.ContentState(progressPercent: 0.0)
+        let activityAttributes = CompressionAttributes(fileName: fileName, totalSizeMb: nil)
+
+        let activityContent = ActivityContent(state: initialContentState, staleDate: nil)
+
+        do {
+            liveActivity = try Activity.request(attributes: activityAttributes, content: activityContent)
+        } catch {
+            print("Failed to start Live Activity: \(error)")
+        }
+    }
+
+    private func updateLiveActivity(progress: Double, fileName: String) {
+        guard let liveActivity = liveActivity else { return }
+        let updatedContentState = CompressionAttributes.ContentState(progressPercent: progress)
+        let updatedContent = ActivityContent(state: updatedContentState, staleDate: nil)
+        Task {
+            await liveActivity.update(updatedContent)
+        }
+    }
+
+    private func endLiveActivity() {
+        guard let activity = liveActivity else { return }
+        liveActivity = nil
+        Task {
+            let finalContentState = activity.content.state
+            let finalContent = ActivityContent(state: finalContentState, staleDate: nil)
+            await activity.end(finalContent, dismissalPolicy: .immediate)
+        }
+    }
+
+    private func sendCompletionNotification(fileName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Compression Complete"
+        content.body = "Finished compressing \(fileName)."
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to send notification: \(error)")
+            }
+        }
+    }
+
+    func clearNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.removeAllDeliveredNotifications()
+        center.removeAllPendingNotificationRequests()
+
+        if #available(iOS 16.0, *) {
+            center.setBadgeCount(0) { error in
+                if let error = error {
+                    print("Failed to clear badge count: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            DispatchQueue.main.async {
+                UIApplication.shared.applicationIconBadgeNumber = 0
             }
         }
     }
@@ -165,6 +254,7 @@ class MainViewModel {
 
     func resetState() {
         compressionState = .idle
+        clearNotifications()
     }
 
     private func clearPreviousOutputFiles() {

@@ -8,15 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		07F0E7DC3049C665C5FE01D8 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 5C39CF1A2DFD0747371E213A /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		09CE16CBBD1582927DA1A434 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
 		0E240A637D688AE51A7F7FB9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
 		1052D51B21E5D27CBA6B28EF /* MainScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */; };
+		1808CCC5A5F56AB82C041BFC /* VideoCompressorWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE213DC1FD821A072068A99 /* VideoCompressorWidgetLiveActivity.swift */; };
 		1D88798119EB60482025F066 /* VideoCompressorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B9C841ACBD0C97034D79CC0 /* VideoCompressorApp.swift */; };
+		22C8B7078AE52B56333B48B5 /* CompressionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8EC08D52BEE6B4BEEA276 /* CompressionAttributes.swift */; };
+		27E08D488DA1197A01B057D6 /* VideoCompressorWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68726B1F0FBA8344BC91F20 /* VideoCompressorWidgetBundle.swift */; };
 		2DA369699F441CA48C3605F8 /* CompressionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DB9D06702BFDA371897ECA /* CompressionState.swift */; };
+		30BD66BB2EE89BA56FDE9B2F /* VideoCompressorWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */; };
 		436AA471237E4F13CA256F3D /* CompressionOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881D3022260B18AD3F09E89 /* CompressionOptions.swift */; };
 		475C3F14414A3232341EDF85 /* VideoInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28703CD5B085F138D571DB11 /* VideoInfo.swift */; };
 		961B4E01D7B7359EB65E3BC0 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C85F63732282D488727BFA4 /* Foundation.framework */; };
 		B50D3CFABF443C9E204DCF2F /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EB936A524734030E09219F /* MainViewModel.swift */; };
 		D7B3F38AF0A433774BF5FA9F /* VideoTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */; };
+		DE75D7E3843E214E47828A0A /* CompressionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8EC08D52BEE6B4BEEA276 /* CompressionAttributes.swift */; };
 		FB94359B3029DE6A572CB474 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DFCFCD096B486A5926E11B /* ShareViewController.swift */; };
 /* End PBXBuildFile section */
 
@@ -38,6 +44,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				07F0E7DC3049C665C5FE01D8 /* ShareExtension.appex in Embed App Extensions */,
+				30BD66BB2EE89BA56FDE9B2F /* VideoCompressorWidgetExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -46,6 +53,7 @@
 
 /* Begin PBXFileReference section */
 		0C85F63732282D488727BFA4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		0EF3B578B49B5C244D47A910 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		144E4EE411B57736A19C400F /* VideoCompressor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VideoCompressor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1B9C841ACBD0C97034D79CC0 /* VideoCompressorApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorApp.swift; sourceTree = "<group>"; };
 		28703CD5B085F138D571DB11 /* VideoInfo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoInfo.swift; sourceTree = "<group>"; };
@@ -54,7 +62,11 @@
 		78EB936A524734030E09219F /* MainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
 		A3DB9D06702BFDA371897ECA /* CompressionState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionState.swift; sourceTree = "<group>"; };
 		A881D3022260B18AD3F09E89 /* CompressionOptions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionOptions.swift; sourceTree = "<group>"; };
+		A8E8EC08D52BEE6B4BEEA276 /* CompressionAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompressionAttributes.swift; sourceTree = "<group>"; };
+		B68726B1F0FBA8344BC91F20 /* VideoCompressorWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorWidgetBundle.swift; sourceTree = "<group>"; };
 		B957AAF5C69D4001200F6FAE /* VideoTranscoder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoTranscoder.swift; sourceTree = "<group>"; };
+		CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VideoCompressorWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCE213DC1FD821A072068A99 /* VideoCompressorWidgetLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCompressorWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		ED48C2B4EA37BA9B93560D94 /* MainScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -75,6 +87,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6E6FAC810A1B7BEB323957F4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				09CE16CBBD1582927DA1A434 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -84,6 +104,7 @@
 				A881D3022260B18AD3F09E89 /* CompressionOptions.swift */,
 				A3DB9D06702BFDA371897ECA /* CompressionState.swift */,
 				28703CD5B085F138D571DB11 /* VideoInfo.swift */,
+				A8E8EC08D52BEE6B4BEEA276 /* CompressionAttributes.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -106,6 +127,7 @@
 			children = (
 				144E4EE411B57736A19C400F /* VideoCompressor.app */,
 				5C39CF1A2DFD0747371E213A /* ShareExtension.appex */,
+				CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -133,6 +155,7 @@
 				CD77CBD7AEEB94AC0E727B46 /* Frameworks */,
 				2D8DF67A282732E5A21AAED9 /* VideoCompressor */,
 				66953914F63A96456A4A10A9 /* ShareExtension */,
+				D93439C2AAB2519479E72C7B /* VideoCompressorWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -175,9 +198,37 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		D93439C2AAB2519479E72C7B /* VideoCompressorWidget */ = {
+			isa = PBXGroup;
+			children = (
+				0EF3B578B49B5C244D47A910 /* Info.plist */,
+				B68726B1F0FBA8344BC91F20 /* VideoCompressorWidgetBundle.swift */,
+				DCE213DC1FD821A072068A99 /* VideoCompressorWidgetLiveActivity.swift */,
+			);
+			name = VideoCompressorWidget;
+			path = VideoCompressorWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		03B6AE3CE39BD2CB18613D2B /* VideoCompressorWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 05358C410B0230BE87016972 /* Build configuration list for PBXNativeTarget "VideoCompressorWidgetExtension" */;
+			buildPhases = (
+				885BC5648D4594EF607C4638 /* Sources */,
+				6E6FAC810A1B7BEB323957F4 /* Frameworks */,
+				E643CAE2E032F94A3B6CFB7B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VideoCompressorWidgetExtension;
+			productName = VideoCompressorWidgetExtension;
+			productReference = CE53422023C7598D2DCE16B9 /* VideoCompressorWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		0A16484B2B1EEB0AF5103189 /* VideoCompressor */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1FBA2AF699CA8DE3008170A3 /* Build configuration list for PBXNativeTarget "VideoCompressor" */;
@@ -246,6 +297,7 @@
 			targets = (
 				0A16484B2B1EEB0AF5103189 /* VideoCompressor */,
 				86CF12A55F722E90DE6F5AE1 /* ShareExtension */,
+				03B6AE3CE39BD2CB18613D2B /* VideoCompressorWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -259,6 +311,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		80202328B6C98CB657FC3BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E643CAE2E032F94A3B6CFB7B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -279,6 +338,17 @@
 				1D88798119EB60482025F066 /* VideoCompressorApp.swift in Sources */,
 				B50D3CFABF443C9E204DCF2F /* MainViewModel.swift in Sources */,
 				1052D51B21E5D27CBA6B28EF /* MainScreen.swift in Sources */,
+				DE75D7E3843E214E47828A0A /* CompressionAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		885BC5648D4594EF607C4638 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				27E08D488DA1197A01B057D6 /* VideoCompressorWidgetBundle.swift in Sources */,
+				1808CCC5A5F56AB82C041BFC /* VideoCompressorWidgetLiveActivity.swift in Sources */,
+				22C8B7078AE52B56333B48B5 /* CompressionAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +535,23 @@
 			};
 			name = Release;
 		};
+		CC80A3CAC42C74F2DCD2CB8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ryotn.VideoCompressor.VideoCompressorWidgetExtension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		CC83F6592096EA73A09DBE65 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -486,9 +573,36 @@
 			};
 			name = Release;
 		};
+		D8163F1C2349DDDA78ACA4CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ryotn.VideoCompressor.VideoCompressorWidgetExtension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		05358C410B0230BE87016972 /* Build configuration list for PBXNativeTarget "VideoCompressorWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D8163F1C2349DDDA78ACA4CD /* Release */,
+				CC80A3CAC42C74F2DCD2CB8E /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		1FBA2AF699CA8DE3008170A3 /* Build configuration list for PBXNativeTarget "VideoCompressor" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
