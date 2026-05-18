@@ -158,13 +158,13 @@
 				2D8DF67A282732E5A21AAED9 /* VideoCompressor */,
 				66953914F63A96456A4A10A9 /* ShareExtension */,
 				D93439C2AAB2519479E72C7B /* VideoCompressorWidget */,
-				BAAF438B9A0398093F042A49 /* Assets.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
 		8E5C65BDCAE6A8BFCCAFBE2C /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				BAAF438B9A0398093F042A49 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -208,7 +208,6 @@
 				B68726B1F0FBA8344BC91F20 /* VideoCompressorWidgetBundle.swift */,
 				DCE213DC1FD821A072068A99 /* VideoCompressorWidgetLiveActivity.swift */,
 			);
-			name = VideoCompressorWidget;
 			path = VideoCompressorWidget;
 			sourceTree = "<group>";
 		};
@@ -277,6 +276,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					03B6AE3CE39BD2CB18613D2B = {
+						DevelopmentTeam = EDDF2QFFRU;
+					};
 					0A16484B2B1EEB0AF5103189 = {
 						DevelopmentTeam = EDDF2QFFRU;
 					};
@@ -545,6 +547,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
 				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
@@ -583,6 +586,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				DEVELOPMENT_TEAM = EDDF2QFFRU;
 				INFOPLIST_FILE = VideoCompressorWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
