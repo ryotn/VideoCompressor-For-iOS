@@ -37,7 +37,6 @@ struct VideoCompressorApp: App {
         WindowGroup {
             MainScreen(viewModel: mainViewModel)
                 .onAppear {
-                    mainViewModel.clearNotifications()
                     NotificationDelegate.shared.onNotificationTapped = {
                         // Switch to completed step if it's currently completed
                         // Note: The app state handles showing completed if compressionState is .completed

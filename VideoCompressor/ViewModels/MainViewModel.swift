@@ -21,6 +21,10 @@ class MainViewModel {
     // Supported codecs (only checking what hardware supports is ideal, but let's assume standard ones are available)
     let supportedVideoCodecs: [VideoCodec] = [.h264, .h265]
 
+    init() {
+        clearNotifications()
+    }
+
     func updateOptions(_ options: CompressionOptions) {
         self.compressionOptions = options
     }
