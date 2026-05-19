@@ -134,6 +134,7 @@ struct MainScreen: View {
                             }
                         case .completed:
                             Button(action: {
+                                viewModel.clearAllNotifications()
                                 viewModel.resetState()
                                 currentStep = .selection
                             }) {

@@ -1,57 +1,41 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 
-class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = NotificationDelegate()
-
-    var onNotificationTapped: (() -> Void)?
-
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-            // User tapped the notification
-            Task {
-                await MainActor.run {
-                    self.onNotificationTapped?()
-                }
-            }
-        }
-        completionHandler()
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        MainViewModel.clearAllNotifications()
+        return true
     }
 
-    // Allow showing notification while app is in foreground
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound])
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        MainViewModel.clearAllNotifications()
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        return [.banner, .list, .sound, .badge]
     }
 }
 
 @main
 struct VideoCompressorApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var mainViewModel = MainViewModel()
 
     init() {
-        requestNotificationPermission()
-        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+        MainViewModel.clearAllNotifications()
     }
 
     var body: some Scene {
         WindowGroup {
             MainScreen(viewModel: mainViewModel)
-                .onAppear {
-                    NotificationDelegate.shared.onNotificationTapped = {
-                        // Switch to completed step if it's currently completed
-                        // Note: The app state handles showing completed if compressionState is .completed
-                        // But we might need a way to explicitly focus the app or ensure the step is right.
-                        // For now, if the state is completed, it should already be on the completed screen.
-                    }
-                }
-        }
-    }
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error.localizedDescription)")
-            }
         }
     }
 }

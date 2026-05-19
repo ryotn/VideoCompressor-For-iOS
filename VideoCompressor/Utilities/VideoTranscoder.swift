@@ -1,9 +1,12 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 import VideoToolbox
 
-class VideoTranscoder {
+extension AVAssetWriterInput: @retroactive @unchecked Sendable {}
+extension AVAssetReaderTrackOutput: @retroactive @unchecked Sendable {}
+
+final class VideoTranscoder: @unchecked Sendable {
     let inputURL: URL
     let outputURL: URL
     let options: CompressionOptions
@@ -81,7 +84,7 @@ class VideoTranscoder {
             var channelCount = 2
             var sampleRate = 44100.0
 
-            if let formatDescriptions = try? await audioTrack.load(.formatDescriptions) as? [CMAudioFormatDescription], let desc = formatDescriptions.first, let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc) {
+            if let formatDescriptions = try? await audioTrack.load(.formatDescriptions), let desc = formatDescriptions.first, let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc) {
                 channelCount = Int(asbd.pointee.mChannelsPerFrame)
                 sampleRate = asbd.pointee.mSampleRate
             }

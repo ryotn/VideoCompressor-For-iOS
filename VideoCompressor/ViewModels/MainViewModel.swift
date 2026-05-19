@@ -3,6 +3,7 @@ import AVFoundation
 import SwiftUI
 import PhotosUI
 import ActivityKit
+import UserNotifications
 
 @Observable
 class MainViewModel {
@@ -21,10 +22,6 @@ class MainViewModel {
     // Supported codecs (only checking what hardware supports is ideal, but let's assume standard ones are available)
     let supportedVideoCodecs: [VideoCodec] = [.h264, .h265]
 
-    init() {
-        clearNotifications()
-    }
-
     func updateOptions(_ options: CompressionOptions) {
         self.compressionOptions = options
     }
@@ -39,6 +36,7 @@ class MainViewModel {
 
     @MainActor
     func loadVideo(from url: URL) async {
+        clearAllNotifications()
         clearPreviousOutputFiles()
 
         do {
@@ -63,7 +61,7 @@ class MainViewModel {
 
             // simple check for codec
             var videoCodecMime: String? = nil
-            if let formatDescriptions = try? await videoTrack.load(.formatDescriptions) as? [CMFormatDescription], let desc = formatDescriptions.first {
+            if let formatDescriptions = try? await videoTrack.load(.formatDescriptions), let desc = formatDescriptions.first {
                 let mediaSubType = CMFormatDescriptionGetMediaSubType(desc)
                 if mediaSubType == kCMVideoCodecType_HEVC {
                     videoCodecMime = "video/hevc"
@@ -99,6 +97,8 @@ class MainViewModel {
         guard !compressionState.isActive else { return }
         guard let info = videoInfo else { return }
 
+        clearAllNotifications()
+
         let options: CompressionOptions
         switch compressionMode {
         case .simple:
@@ -120,7 +120,6 @@ class MainViewModel {
         compressionState = .preparing
         self.lastReportedProgress = 0.0
 
-        clearNotifications()
         startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
@@ -134,17 +133,16 @@ class MainViewModel {
             ) { [weak self] progress in
                 Task { @MainActor in
                     guard let self = self else { return }
-                    let progressPercent = progress * 100.0
+                    let progressPercent = progress * 100
                     if case .inProgress(_, let elapsed) = self.compressionState {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: elapsed)
                     } else {
                         self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: 0)
                     }
 
-                    let progressPercentDouble = Double(progressPercent)
-                    if progressPercentDouble - self.lastReportedProgress >= 10.0 || progressPercentDouble >= 100.0 {
-                        self.lastReportedProgress = progressPercentDouble
-                        self.updateLiveActivity(progress: progressPercentDouble, fileName: info.displayName)
+                    if Double(progressPercent) - self.lastReportedProgress >= 10.0 || progressPercent == 100.0 {
+                        self.lastReportedProgress = Double(progressPercent)
+                        self.updateLiveActivity(progress: Double(progressPercent), fileName: info.displayName)
                     }
                 }
             }
@@ -154,28 +152,28 @@ class MainViewModel {
             do {
                 let success = try await transcoder.transcode()
                 if success {
-                    self.sendCompletionNotification(fileName: info.displayName)
                     let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
                     Task { @MainActor in
                         self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
+                        self.endLiveActivity()
+                        self.sendCompletionNotification(fileName: info.displayName)
                     }
-                    self.endLiveActivity()
                 } else if transcoder.isCancelled {
                     Task { @MainActor in
                         self.compressionState = .cancelled
+                        self.endLiveActivity()
                     }
-                    self.endLiveActivity()
                 } else {
                     Task { @MainActor in
                         self.compressionState = .failed(error: "Compression failed.")
+                        self.endLiveActivity()
                     }
-                    self.endLiveActivity()
                 }
             } catch {
                 Task { @MainActor in
                     self.compressionState = .failed(error: error.localizedDescription)
+                    self.endLiveActivity()
                 }
-                self.endLiveActivity()
             }
         }
     }
@@ -206,12 +204,23 @@ class MainViewModel {
     }
 
     private func endLiveActivity() {
-        guard let activity = liveActivity else { return }
+        let primaryActivity = liveActivity
         liveActivity = nil
+
         Task {
-            let finalContentState = activity.content.state
-            let finalContent = ActivityContent(state: finalContentState, staleDate: nil)
-            await activity.end(finalContent, dismissalPolicy: .immediate)
+            var endedActivityIDs = Set<String>()
+
+            if let primaryActivity = primaryActivity {
+                let finalContent = ActivityContent(state: primaryActivity.content.state, staleDate: Date())
+                await primaryActivity.end(finalContent, dismissalPolicy: .immediate)
+                endedActivityIDs.insert(primaryActivity.id)
+            }
+
+            // Clean up orphaned activities in case local reference was lost.
+            for activity in Activity<CompressionAttributes>.activities where !endedActivityIDs.contains(activity.id) {
+                let finalContent = ActivityContent(state: activity.content.state, staleDate: Date())
+                await activity.end(finalContent, dismissalPolicy: .immediate)
+            }
         }
     }
 
@@ -229,7 +238,7 @@ class MainViewModel {
         }
     }
 
-    func clearNotifications() {
+    static func clearAllNotifications() {
         let center = UNUserNotificationCenter.current()
         center.removeAllDeliveredNotifications()
         center.removeAllPendingNotificationRequests()
@@ -247,6 +256,10 @@ class MainViewModel {
         }
     }
 
+    func clearAllNotifications() {
+        Self.clearAllNotifications()
+    }
+
     func cancelCompression() {
         currentTranscoder?.isCancelled = true
         transcodeTask?.cancel()
@@ -254,7 +267,6 @@ class MainViewModel {
 
     func resetState() {
         compressionState = .idle
-        clearNotifications()
     }
 
     private func clearPreviousOutputFiles() {
