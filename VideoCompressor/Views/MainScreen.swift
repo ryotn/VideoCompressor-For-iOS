@@ -162,10 +162,24 @@ struct MainScreen: View {
                     isLoadingVideo = false
                 }
             }
-            .onChange(of: viewModel.compressionState) { _, newState in
-                if newState.isActive {
+            .onChange(of: viewModel.compressionState.isActive) { _, isActive in
+                if isActive {
+                    if currentStep != .progress {
+                        currentStep = .progress
+                    }
+                }
+            }
+            .onChange(of: isCompressionCompleted) { _, isCompleted in
+                if isCompleted {
+                    if currentStep != .completed {
+                        currentStep = .completed
+                    }
+                }
+            }
+            .onAppear {
+                if viewModel.compressionState.isActive {
                     currentStep = .progress
-                } else if case .completed = newState {
+                } else if case .completed = viewModel.compressionState {
                     currentStep = .completed
                 }
             }
@@ -202,6 +216,8 @@ struct MainScreen: View {
     private func handleIncomingURL(_ url: URL) {
         Task {
             isLoadingVideo = true
+            let fileManager = FileManager.default
+            let workingDir = MainViewModel.managedTemporaryDirectoryURL()
 
             // Check if it's from the share extension via custom scheme
             if url.scheme == "videocompressor", let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -209,18 +225,22 @@ struct MainScreen: View {
 
                 let groupIdentifier = "group.com.ryotn.VideoCompressor"
                 if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) {
-                    let sharedFile = groupURL.appendingPathComponent("SharedVideo").appendingPathComponent(fileName)
+                    let sharedDirectory = groupURL.appendingPathComponent("SharedVideo")
+                    let sharedFile = sharedDirectory.appendingPathComponent(fileName)
 
-                    if FileManager.default.fileExists(atPath: sharedFile.path) {
-                        let tempDir = FileManager.default.temporaryDirectory
-                        let targetUrl = tempDir.appendingPathComponent(fileName)
-                        try? FileManager.default.removeItem(at: targetUrl)
-                        try? FileManager.default.moveItem(at: sharedFile, to: targetUrl)
+                    if fileManager.fileExists(atPath: sharedFile.path) {
+                        let targetUrl = workingDir.appendingPathComponent(fileName)
+                        MainViewModel.cleanupManagedTemporaryFiles()
+                        try? fileManager.removeItem(at: targetUrl)
+                        try? fileManager.moveItem(at: sharedFile, to: targetUrl)
+                        cleanupSharedImportDirectory(sharedDirectory)
 
                         await viewModel.loadVideo(from: targetUrl)
                         isLoadingVideo = false
                         return
                     }
+
+                    cleanupSharedImportDirectory(sharedDirectory)
                 }
             }
 
@@ -231,17 +251,27 @@ struct MainScreen: View {
                 }
             }
 
-            let tempDir = FileManager.default.temporaryDirectory
-            let targetUrl = tempDir.appendingPathComponent(url.lastPathComponent)
-            try? FileManager.default.removeItem(at: targetUrl)
+            let targetUrl = workingDir.appendingPathComponent(url.lastPathComponent)
+            MainViewModel.cleanupManagedTemporaryFiles()
+            try? fileManager.removeItem(at: targetUrl)
 
             do {
-                try FileManager.default.copyItem(at: url, to: targetUrl)
+                try fileManager.copyItem(at: url, to: targetUrl)
                 await viewModel.loadVideo(from: targetUrl)
             } catch {
                 print("Failed to copy incoming URL: \(error)")
             }
             isLoadingVideo = false
+        }
+    }
+
+    private func cleanupSharedImportDirectory(_ directoryURL: URL) {
+        guard let fileURLs = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
+            return
+        }
+
+        for fileURL in fileURLs {
+            try? FileManager.default.removeItem(at: fileURL)
         }
     }
 }
@@ -252,10 +282,12 @@ struct VideoTransferable: Transferable {
         FileRepresentation(contentType: .movie) { transferable in
             SentTransferredFile(transferable.url)
         } importing: { received in
-            let tempDir = FileManager.default.temporaryDirectory
-            let targetUrl = tempDir.appendingPathComponent(received.file.lastPathComponent)
-            try? FileManager.default.removeItem(at: targetUrl)
-            try FileManager.default.copyItem(at: received.file, to: targetUrl)
+            let fileManager = FileManager.default
+            let workingDir = MainViewModel.managedTemporaryDirectoryURL()
+            let targetUrl = workingDir.appendingPathComponent(received.file.lastPathComponent)
+            MainViewModel.cleanupManagedTemporaryFiles()
+            try? fileManager.removeItem(at: targetUrl)
+            try fileManager.copyItem(at: received.file, to: targetUrl)
             return VideoTransferable(url: targetUrl)
         }
     }
@@ -711,6 +743,13 @@ struct CompletedStepContent: View {
 }
 
 extension MainScreen {
+    private var isCompressionCompleted: Bool {
+        if case .completed = viewModel.compressionState {
+            return true
+        }
+        return false
+    }
+
     private var navigationTitleText: String {
         switch currentStep {
         case .selection:

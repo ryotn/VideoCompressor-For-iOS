@@ -7,6 +7,12 @@ import UserNotifications
 
 @Observable
 class MainViewModel {
+    private enum CompletionNotificationKey {
+        static let outputPath = "outputPath"
+        static let originalSizeBytes = "originalSizeBytes"
+        static let outputSizeBytes = "outputSizeBytes"
+    }
+
     var videoInfo: VideoInfo?
     var compressionOptions: CompressionOptions = CompressionOptions()
     var simpleOptions: SimpleCompressionOptions = SimpleCompressionOptions()
@@ -14,10 +20,13 @@ class MainViewModel {
     var compressionState: CompressionState = .idle
     var saveDirectoryURL: URL?
 
+    private static let managedTempDirectoryName = "VideoCompressorWorking"
+
     private var currentTranscoder: VideoTranscoder?
     private var transcodeTask: Task<Void, Never>?
     private var liveActivity: Activity<CompressionAttributes>?
     private var lastReportedProgress: Double = 0.0
+    private var activeCompressionRunID: UUID?
 
     // Supported codecs (only checking what hardware supports is ideal, but let's assume standard ones are available)
     let supportedVideoCodecs: [VideoCodec] = [.h264, .h265]
@@ -38,6 +47,8 @@ class MainViewModel {
     func loadVideo(from url: URL) async {
         clearAllNotifications()
         clearPreviousOutputFiles()
+        Self.cleanupManagedTemporaryFiles(excluding: [url])
+        Self.cleanupTemporaryRootFiles(excluding: [url])
 
         do {
             let asset = AVURLAsset(url: url)
@@ -83,6 +94,9 @@ class MainViewModel {
                 videoCodecMime: videoCodecMime
             )
 
+            Self.cleanupManagedTemporaryFiles(excluding: [url])
+            Self.cleanupTemporaryRootFiles(excluding: [url])
+
             // Adjust simple options target size
             if let info = self.videoInfo {
                 self.simpleOptions.targetSizeMb = SimpleCompressionOptions.computeMaxSizeMb(videoInfo: info)
@@ -90,6 +104,8 @@ class MainViewModel {
         } catch {
             print("Failed to load video info: \(error)")
             self.compressionState = .failed(error: "Failed to load video info: \(error.localizedDescription)")
+            Self.cleanupManagedTemporaryFiles(excluding: [url])
+            Self.cleanupTemporaryRootFiles(excluding: [url])
         }
     }
 
@@ -112,20 +128,27 @@ class MainViewModel {
         let originalName = (info.displayName as NSString).deletingPathExtension
         let outputFileName = "\(originalName)_Compress.mp4"
         let outputURL = outputDirectory.appendingPathComponent(outputFileName)
+        let temporaryOutputURL = Self.managedTemporaryDirectoryURL().appendingPathComponent("\(UUID().uuidString)_CompressTemp.mp4")
+
+        Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+        Self.cleanupTemporaryRootFiles(excluding: [info.url])
 
         if fileManager.fileExists(atPath: outputURL.path) {
             try? fileManager.removeItem(at: outputURL)
         }
+        Self.removeFileIfExists(at: temporaryOutputURL)
 
         compressionState = .preparing
         self.lastReportedProgress = 0.0
+        let runID = UUID()
+        self.activeCompressionRunID = runID
 
         startLiveActivity(fileName: info.displayName)
 
         transcodeTask = Task {
             let transcoder = VideoTranscoder(
                 inputURL: info.url,
-                outputURL: outputURL,
+                outputURL: temporaryOutputURL,
                 options: options,
                 originalBitrate: info.bitrateBps,
                 originalAudioBitrate: info.audioBitrateBps,
@@ -133,11 +156,18 @@ class MainViewModel {
             ) { [weak self] progress in
                 Task { @MainActor in
                     guard let self = self else { return }
-                    let progressPercent = progress * 100
+                    guard self.activeCompressionRunID == runID else { return }
+                    let progressPercent = min(100.0, max(0.0, progress * 100.0))
+                    let roundedProgress = (progressPercent * 10).rounded() / 10
                     if case .inProgress(_, let elapsed) = self.compressionState {
-                        self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: elapsed)
+                        if roundedProgress < 100.0,
+                           case .inProgress(let currentProgress, _) = self.compressionState,
+                           roundedProgress - currentProgress < 0.2 {
+                            return
+                        }
+                        self.compressionState = .inProgress(progressPercent: roundedProgress, elapsedMs: elapsed)
                     } else {
-                        self.compressionState = .inProgress(progressPercent: progressPercent, elapsedMs: 0)
+                        self.compressionState = .inProgress(progressPercent: roundedProgress, elapsedMs: 0)
                     }
 
                     if Double(progressPercent) - self.lastReportedProgress >= 10.0 || progressPercent == 100.0 {
@@ -151,29 +181,81 @@ class MainViewModel {
 
             do {
                 let success = try await transcoder.transcode()
+                if self.activeCompressionRunID != runID {
+                    Self.removeFileIfExists(at: temporaryOutputURL)
+                    Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                    Self.cleanupTemporaryRootFiles(excluding: [info.url])
+                    return
+                }
+
                 if success {
-                    let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
-                    Task { @MainActor in
-                        self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
-                        self.endLiveActivity()
-                        self.sendCompletionNotification(fileName: info.displayName)
+                    do {
+                        if fileManager.fileExists(atPath: outputURL.path) {
+                            try? fileManager.removeItem(at: outputURL)
+                        }
+                        try fileManager.moveItem(at: temporaryOutputURL, to: outputURL)
+
+                        let outputSize = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map { Int64($0) } ?? 0
+                        Task { @MainActor in
+                            guard self.activeCompressionRunID == runID else { return }
+                            self.compressionState = .completed(outputPath: outputURL.path, originalSizeBytes: info.sizeBytes, outputSizeBytes: outputSize)
+                            self.activeCompressionRunID = nil
+                            self.endLiveActivity()
+                            self.sendCompletionNotification(
+                                fileName: info.displayName,
+                                outputPath: outputURL.path,
+                                originalSizeBytes: info.sizeBytes,
+                                outputSizeBytes: outputSize
+                            )
+                        }
+                        Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                        Self.cleanupTemporaryRootFiles(excluding: [info.url])
+                    } catch {
+                        Self.removeFileIfExists(at: temporaryOutputURL)
+                        Self.removeFileIfExists(at: outputURL)
+                        Task { @MainActor in
+                            guard self.activeCompressionRunID == runID else { return }
+                            self.compressionState = .failed(error: "Failed to finalize output file: \(error.localizedDescription)")
+                            self.activeCompressionRunID = nil
+                            self.endLiveActivity()
+                        }
+                            Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                            Self.cleanupTemporaryRootFiles(excluding: [info.url])
                     }
                 } else if transcoder.isCancelled {
+                    Self.removeFileIfExists(at: temporaryOutputURL)
+                    Self.removeFileIfExists(at: outputURL)
                     Task { @MainActor in
+                        guard self.activeCompressionRunID == runID else { return }
                         self.compressionState = .cancelled
+                        self.activeCompressionRunID = nil
                         self.endLiveActivity()
                     }
+                        Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                        Self.cleanupTemporaryRootFiles(excluding: [info.url])
                 } else {
+                    Self.removeFileIfExists(at: temporaryOutputURL)
+                    Self.removeFileIfExists(at: outputURL)
                     Task { @MainActor in
+                        guard self.activeCompressionRunID == runID else { return }
                         self.compressionState = .failed(error: "Compression failed.")
+                        self.activeCompressionRunID = nil
                         self.endLiveActivity()
                     }
+                        Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                        Self.cleanupTemporaryRootFiles(excluding: [info.url])
                 }
             } catch {
+                Self.removeFileIfExists(at: temporaryOutputURL)
+                Self.removeFileIfExists(at: outputURL)
                 Task { @MainActor in
+                    guard self.activeCompressionRunID == runID else { return }
                     self.compressionState = .failed(error: error.localizedDescription)
+                    self.activeCompressionRunID = nil
                     self.endLiveActivity()
                 }
+                    Self.cleanupManagedTemporaryFiles(excluding: [info.url])
+                    Self.cleanupTemporaryRootFiles(excluding: [info.url])
             }
         }
     }
@@ -224,11 +306,36 @@ class MainViewModel {
         }
     }
 
-    private func sendCompletionNotification(fileName: String) {
+    @MainActor
+    @discardableResult
+    func restoreCompletionFromNotificationUserInfo(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard
+            let outputPath = userInfo[CompletionNotificationKey.outputPath] as? String,
+            let originalSizeBytes = Self.int64Value(from: userInfo[CompletionNotificationKey.originalSizeBytes]),
+            let outputSizeBytes = Self.int64Value(from: userInfo[CompletionNotificationKey.outputSizeBytes]),
+            FileManager.default.fileExists(atPath: outputPath)
+        else {
+            return false
+        }
+
+        compressionState = .completed(
+            outputPath: outputPath,
+            originalSizeBytes: originalSizeBytes,
+            outputSizeBytes: outputSizeBytes
+        )
+        return true
+    }
+
+    private func sendCompletionNotification(fileName: String, outputPath: String, originalSizeBytes: Int64, outputSizeBytes: Int64) {
         let content = UNMutableNotificationContent()
         content.title = "Compression Complete"
         content.body = "Finished compressing \(fileName)."
         content.sound = .default
+        content.userInfo = [
+            CompletionNotificationKey.outputPath: outputPath,
+            CompletionNotificationKey.originalSizeBytes: originalSizeBytes,
+            CompletionNotificationKey.outputSizeBytes: outputSizeBytes
+        ]
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
@@ -256,13 +363,96 @@ class MainViewModel {
         }
     }
 
+    static func managedTemporaryDirectoryURL() -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory.appendingPathComponent(managedTempDirectoryName, isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directoryURL.path) {
+            try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        }
+        return directoryURL
+    }
+
+    static func cleanupManagedTemporaryFiles(excluding urlsToKeep: [URL] = []) {
+        let fileManager = FileManager.default
+        let directoryURL = managedTemporaryDirectoryURL()
+        let keepPaths = Set(urlsToKeep.map { $0.standardizedFileURL.path })
+
+        guard let fileURLs = try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
+            return
+        }
+
+        for fileURL in fileURLs {
+            if keepPaths.contains(fileURL.standardizedFileURL.path) {
+                continue
+            }
+            try? fileManager.removeItem(at: fileURL)
+        }
+    }
+
+    static func cleanupTemporaryRootFiles(excluding urlsToKeep: [URL] = []) {
+        let fileManager = FileManager.default
+        let tempDirectory = fileManager.temporaryDirectory
+        let managedDirectory = managedTemporaryDirectoryURL().standardizedFileURL.path
+        let keepPaths = Set(urlsToKeep.map { $0.standardizedFileURL.path })
+
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: tempDirectory,
+            includingPropertiesForKeys: nil,
+            options: []
+        ) else {
+            return
+        }
+
+        for fileURL in fileURLs {
+            let standardizedPath = fileURL.standardizedFileURL.path
+            if standardizedPath == managedDirectory || keepPaths.contains(standardizedPath) {
+                continue
+            }
+
+            try? fileManager.removeItem(at: fileURL)
+        }
+    }
+
     func clearAllNotifications() {
         Self.clearAllNotifications()
     }
 
+    private static func int64Value(from value: Any?) -> Int64? {
+        switch value {
+        case let intValue as Int64:
+            return intValue
+        case let intValue as Int:
+            return Int64(intValue)
+        case let numberValue as NSNumber:
+            return numberValue.int64Value
+        case let stringValue as String:
+            return Int64(stringValue)
+        default:
+            return nil
+        }
+    }
+
+    private static func removeFileIfExists(at url: URL) {
+        if FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     func cancelCompression() {
+        let currentInputURL = videoInfo?.url
+        activeCompressionRunID = nil
         currentTranscoder?.isCancelled = true
         transcodeTask?.cancel()
+        transcodeTask = nil
+        currentTranscoder = nil
+        endLiveActivity()
+        compressionState = .cancelled
+        if let currentInputURL {
+            Self.cleanupManagedTemporaryFiles(excluding: [currentInputURL])
+            Self.cleanupTemporaryRootFiles(excluding: [currentInputURL])
+        } else {
+            Self.cleanupManagedTemporaryFiles()
+            Self.cleanupTemporaryRootFiles()
+        }
     }
 
     func resetState() {

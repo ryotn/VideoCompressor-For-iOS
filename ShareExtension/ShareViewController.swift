@@ -75,6 +75,7 @@ class ShareViewController: UIViewController {
 
         let sharedDir = groupURL.appendingPathComponent("SharedVideo")
         try? FileManager.default.createDirectory(at: sharedDir, withIntermediateDirectories: true, attributes: nil)
+        cleanupSharedDirectory(sharedDir)
 
         let destinationURL = sharedDir.appendingPathComponent(url.lastPathComponent)
         try? FileManager.default.removeItem(at: destinationURL)
@@ -112,6 +113,16 @@ class ShareViewController: UIViewController {
                 break
             }
             responder = responder?.next
+        }
+    }
+
+    private func cleanupSharedDirectory(_ directoryURL: URL) {
+        guard let fileURLs = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
+            return
+        }
+
+        for fileURL in fileURLs {
+            try? FileManager.default.removeItem(at: fileURL)
         }
     }
 }
